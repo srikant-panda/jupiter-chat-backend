@@ -25,6 +25,6 @@ export const config = {
   // standard NODE_ENV value as production. This is used by cookie settings.
   PRODUCTION:
     (process.env.PRODUCTION === "true" || process.env.NODE_ENV === "production") &&
-    process.env.LOCAL_TEST !== "true",
+    process.env.LOCAL_TEST !== "true" 
 };
 

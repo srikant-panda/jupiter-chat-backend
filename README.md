@@ -1,6 +1,6 @@
-# NovaChat Backend
+# Jupiter Chat Backend
 
-Backend API for NovaChat, a ChatGPT-style AI chat application built with Node.js, Express, MongoDB, JWT authentication, refresh-token sessions, and streaming AI responses.
+Backend API for Jupiter Chat, a ChatGPT-style AI chat application built with Node.js, Express, MongoDB, JWT authentication, refresh-token sessions, and streaming AI responses.
 
 ## Features
 
@@ -32,7 +32,7 @@ Backend API for NovaChat, a ChatGPT-style AI chat application built with Node.js
 ## Project Structure
 
 ```text
-novachat-backend/
+jupiter-chat-backend/
 ├── config/              # Application configuration
 ├── controllers/         # Request and business logic
 ├── middlewares/         # Authentication and request middleware
@@ -67,7 +67,7 @@ Create a `.env` file in the project root and configure the required values:
 ```env
 PORT=3000
 NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/novachat
+MONGO_URI=mongodb://localhost:27017/jupiter-chat
 JWT_SECRET=replace-with-a-long-random-secret
 OPENROUTER_API_KEY=your-openrouter-key
 ```
@@ -92,7 +92,7 @@ The default API server runs on `http://localhost:3000`.
 
 ## Authentication
 
-NovaChat uses an authenticated-user architecture. Protected resources require an authenticated user.
+Jupiter Chat uses an authenticated-user architecture. Protected resources require an authenticated user.
 
 The authentication model uses a short-lived access token and a refresh-token session:
 
@@ -138,9 +138,11 @@ Chat operations must be scoped to the authenticated user's ID so one user cannot
 GET  /api/message/:chatId
 POST /api/message/:chatId/stream
 POST /api/message/stream
+POST /api/message/:chatId
+POST /api/message
 ```
 
-The streaming endpoints return AI output incrementally so the frontend can render responses as they are generated.
+The streaming endpoints return AI output incrementally via SSE. If a model does not support streaming, the backend automatically falls back to the classic non-streaming service (`generateAIResponse`). Classic request-response endpoints are also available at `POST /api/message` and `POST /api/message/:chatId`.
 
 Typical flow:
 
@@ -191,19 +193,19 @@ When the frontend and backend are deployed on different origins, configure CORS 
 For example:
 
 ```text
-Frontend: https://novachat.vercel.app
-Backend:  https://novachat-backend.onrender.com
+Frontend: https://jupiter-chat.vercel.app
+Backend:  https://jupiter-chat-backend.onrender.com
 ```
 
 For this cross-origin setup, set these backend environment variables:
 
 ```text
 PRODUCTION=true
-VITE_FRONTEND_URL=https://novachat.vercel.app
+VITE_FRONTEND_URL=https://jupiter-chat.vercel.app
 ```
 
 Set the frontend's `VITE_API_URL` to the HTTPS backend API URL, for example
-`https://novachat-backend.onrender.com/api`. The refresh cookie uses
+`https://jupiter-chat-backend.onrender.com/api`. The refresh cookie uses
 `SameSite=None; Secure`, so both deployed URLs must use HTTPS. The frontend
 origin must match exactly (including the scheme and without a trailing slash).
 
@@ -212,8 +214,8 @@ Do not use a wildcard origin with credentialed requests.
 For a production custom-domain architecture, the public API can also be exposed through the same origin:
 
 ```text
-https://novachat.com/
-https://novachat.com/api/*
+https://jupiter-chat.com/
+https://jupiter-chat.com/api/*
 ```
 
 A reverse proxy can route `/api/*` to the backend while the frontend is served separately. This keeps the browser-facing API same-origin even when the backend physically runs on Render.
@@ -282,4 +284,4 @@ For a cleaner production setup, use a custom domain and reverse proxy so the fro
 
 ## License
 
-No license file is currently included. Add a `LICENSE` file if you intend to distribute NovaChat publicly.
+No license file is currently included. Add a `LICENSE` file if you intend to distribute Jupiter Chat publicly.

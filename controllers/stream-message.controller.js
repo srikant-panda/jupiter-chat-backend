@@ -9,7 +9,11 @@ import {
   resetTokenUsageIfNeeded,
 } from "../utils/userUsage.js";
 import { updateSummaryIfNeeded } from "../services/summary.service.js";
-import { generateAIResponseStream } from "../services/openrouter.stream.service.js";
+import { generateAIResponse } from "../services/openrouter.service.js";
+import {
+  generateAIResponseStream,
+  isStreamingNotSupportedError,
+} from "../services/openrouter.stream.service.js";
 
 const sendEvent = (res, event, data) => {
   if (res.writableEnded) return;
@@ -118,14 +122,40 @@ export const streamMessage = async (req, res) => {
       streamClosed = true;
     });
 
-    const { result, usage } = await generateAIResponseStream({
-      model: model?model:chat.model,
-      messages: preparedMessages,
-      onToken: async (text) => {
-        if (!streamClosed) sendEvent(res, "token", { text });
-      },
-      onUsage: async () => {},
-    });
+    let result;
+    let usage;
+    let tokenSent = false;
+
+    try {
+      const streamData = await generateAIResponseStream({
+        model: model ? model : chat.model,
+        messages: preparedMessages,
+        onToken: async (text) => {
+          tokenSent = true;
+          if (!streamClosed) sendEvent(res, "token", { text });
+        },
+        onUsage: async () => {},
+      });
+      result = streamData.result;
+      usage = streamData.usage;
+    } catch (streamErr) {
+      if (!tokenSent && isStreamingNotSupportedError(streamErr)) {
+        console.warn(
+          `[Stream Message Controller] Model does not support streaming (${streamErr.message}). Using classic request-response...`
+        );
+        const classicData = await generateAIResponse({
+          model: model ? model : chat.model,
+          messages: preparedMessages,
+        });
+        result = classicData.result;
+        usage = classicData.usage;
+        if (!streamClosed && result) {
+          sendEvent(res, "token", { text: result });
+        }
+      } else {
+        throw streamErr;
+      }
+    }
 
     const assistantMessage = await Message.create({
       userId: req.tokenData.id,

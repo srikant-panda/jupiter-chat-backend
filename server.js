@@ -34,7 +34,10 @@ app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (FRONTEND_URLS.includes(origin) || (LOCAL_TEST && devOriginPattern.test(origin))) {
+      if (
+        FRONTEND_URLS.includes(origin) ||
+        (LOCAL_TEST && devOriginPattern.test(origin))
+      ) {
         return callback(null, true);
       }
       return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
@@ -52,7 +55,10 @@ app.use(cookieParser());
 app.set("trust proxy", 1);
 
 app.get("/", async (req, res) => {
-  res.json({ message: "Chathgpt backend is running...", status: "running" });
+  res.json({
+    message: "Jupiter Chat backend is running...",
+    status: "running",
+  });
 });
 
 app.get(["/health", "/api/health"], async (req, res) => {
@@ -88,6 +94,14 @@ app.use((err, req, res, next) => {
     message: err.message || "Internal server error",
   });
 });
+
+if (
+  !process.env.GOOGLE_CLIENT_ID ||
+  !process.env.GOOGLE_CLIENT_SECRET ||
+  !process.env.GOOGLE_REDIRECT_URL
+) {
+  console.log("Google client ID,SCRET,Redirect url is need to proceed oauth.");
+}
 
 const startServer = async () => {
   try {
