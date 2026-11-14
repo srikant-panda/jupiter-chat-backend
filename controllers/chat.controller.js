@@ -1,5 +1,6 @@
 import Chat from "../models/chat.model.js";
 import Message from "../models/message.model.js";
+import AIModel, { ensureDefaultModelsSeeded } from "../models/aiModel.model.js";
 import mongoose  from "mongoose";
 
 
@@ -29,18 +30,35 @@ export const createChat = async (req, res) => {
         .status(400)
         .json({ message: "Model name is missing.", success: false });
     }
+
+    // Validate that the model exists and is active in the database
+    let validModel = await AIModel.findOne({ modelId: model.trim(), isActive: true });
+    if (!validModel) {
+      // If collection is not seeded yet, seed and check again
+      await ensureDefaultModelsSeeded();
+      validModel = await AIModel.findOne({ modelId: model.trim(), isActive: true });
+    }
+
+    if (!validModel) {
+      return res.status(400).json({
+        message: `Invalid model: "${model}". Please select a valid active model from available models.`,
+        success: false,
+        invalidModel: true,
+      });
+    }
+
     const createdChat = await Chat.create({
       userId: req.tokenData.id,
       topic,
-      model,
+      model: validModel.modelId,
     });
     res.status(201).json({
       message: "Chat created successfully.",
       chatData: {
-        chatId: createChat._id,
+        chatId: createdChat._id,
         userId: req.tokenData.id,
-        model,
-        topic: createChat.topic,
+        model: createdChat.model,
+        topic: createdChat.topic,
       },
     });
   } catch (err) {

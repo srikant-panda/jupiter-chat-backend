@@ -8,25 +8,42 @@ import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import chatRouter from "./routes/chat.routes.js";
 import messageRouter from "./routes/message.routes.js";
+import modelRouter from "./routes/model.routes.js";
+import adminRouter from "./routes/admin.routes.js";
+import { ensureDefaultModelsSeeded } from "./models/aiModel.model.js";
 import cors from "cors";
 
 const app = express();
 const LOCAL_TEST = process.env.LOCAL_TEST === "true" || false;
 const devOriginPattern =
-  /^http:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(5173|8081)$/;
+  /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(5173|5174|8081)$/;
+
+const MOBILE_ORIGINS = [
+  "https://localhost",
+  "http://localhost",
+  "capacitor://localhost",
+  "ionic://localhost",
+];
+
 let FRONTEND_URLS = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "http://localhost:8081",
   "http://127.0.0.1:8081",
+  ...MOBILE_ORIGINS,
 ];
 if (!LOCAL_TEST) {
   if (!process.env.VITE_FRONTEND_URL)
     throw new Error("Frontend URL is not  defined in env.");
 
-  FRONTEND_URLS = process.env.VITE_FRONTEND_URL.split(",")
-    .map((url) => url.trim().replace(/\/+$/, ""))
-    .filter(Boolean);
+  FRONTEND_URLS = [
+    ...process.env.VITE_FRONTEND_URL.split(",")
+      .map((url) => url.trim().replace(/\/+$/, ""))
+      .filter(Boolean),
+    ...MOBILE_ORIGINS,
+  ];
 }
 
 app.use(morgan("dev"));
@@ -36,6 +53,7 @@ app.use(
       if (!origin) return callback(null, true);
       if (
         FRONTEND_URLS.includes(origin) ||
+        MOBILE_ORIGINS.includes(origin) ||
         (LOCAL_TEST && devOriginPattern.test(origin))
       ) {
         return callback(null, true);
@@ -71,6 +89,8 @@ app.use("/api/auth/", authRouter);
 app.use("/api/user/", userRouter);
 app.use("/api/chat/", chatRouter);
 app.use("/api/message/", messageRouter);
+app.use("/api/models/", modelRouter);
+app.use("/api/admin/", adminRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -106,6 +126,7 @@ if (
 const startServer = async () => {
   try {
     await connectDB();
+    await ensureDefaultModelsSeeded();
     app.listen(config.PORT, () => {
       console.log(`server started on port ${config.PORT}.`);
       console.log(`Allowed frontend URLs: ${FRONTEND_URLS.join(", ")}`);

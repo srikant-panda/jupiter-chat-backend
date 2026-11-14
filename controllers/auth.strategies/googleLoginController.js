@@ -2,7 +2,7 @@ import { google } from "googleapis";
 import crypto from "crypto";
 import User from "../../models/user.model.js";
 import { createUser } from "../../utils/userCreate.js";
-import { sendTokens } from "../../utils/jwtAndCookie.utils.js";
+// import { sendTokens } from "../../utils/jwtAndCookie.utils.js";
 import {
   setCache,
   getCache,
@@ -75,7 +75,7 @@ export const googleCallbackHandler = async (req, res) => {
       method: "google",
     });
   }
-  console.log(user);
+  // console.log(user);
   const code = crypto.randomBytes(32).toString("hex");
   setCache(`oauth:google:code:${code}`, { provider: "google",id:user._id,email:user.email }, 5 * 60 * 1000);
   const baseRedirect = redirectUrl || "http://localhost:5173/auth/callback";

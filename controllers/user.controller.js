@@ -14,6 +14,7 @@ export const getMe = async (req, res) => {
       name: user.name,
       email: user.email,
       usage: user.usage,
+      admin: Boolean(user.admin === true || user.isAdmin === true),
     },
   });
 };

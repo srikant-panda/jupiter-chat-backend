@@ -23,6 +23,9 @@ export const codeExchangeController = async (req, res) => {
         .json({ message: "code mismatch.try again", success: false });
     }
 
+    // Immediately invalidate the one-time code to prevent concurrent duplicate session creation
+    deleteCache(cacheKey);
+
     const { token: accessToken } = createToken(value.id, value.email, "60m");
     const { token: refreshToken, JTI: refreshTokenJTI } = createToken(
       value.id,
@@ -36,7 +39,6 @@ export const codeExchangeController = async (req, res) => {
     });
 
     if (isStored) {
-      deleteCache(cacheKey);
       res.set("Authorization", `Bearer ${accessToken}`);
       res.cookie("refreshToken", refreshToken, getCookieOptions(req));
       return res.json({

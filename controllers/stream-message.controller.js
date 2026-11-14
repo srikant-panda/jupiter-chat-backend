@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Message from "../models/message.model.js";
 import Chat from "../models/chat.model.js";
+import AIModel, { ensureDefaultModelsSeeded } from "../models/aiModel.model.js";
 import { generatePrompt } from "../utils/generatePrompt.js";
 import { chatTokenUsage } from "../utils/tokenUsage.js";
 import {
@@ -58,16 +59,50 @@ export const streamMessage = async (req, res) => {
         return res.status(404).json({ message: "Chat not found", success: false });
       }
     } else {
-      const selectedModel = model || process.env.DEFAULT_AI_MODEL;
+      let candidateModel = model;
+      if (!candidateModel) {
+        const defaultDoc = await AIModel.findOne({ isDefault: true, isActive: true });
+        candidateModel = defaultDoc?.modelId || process.env.DEFAULT_AI_MODEL || "openrouter/free";
+      }
 
-      if (!selectedModel) {
-        return res.status(400).json({ message: "Model not provided.", success: false });
+      let validModel = await AIModel.findOne({ modelId: candidateModel, isActive: true });
+      if (!validModel) {
+        await ensureDefaultModelsSeeded();
+        validModel = await AIModel.findOne({ modelId: candidateModel, isActive: true });
+      }
+
+      if (!validModel) {
+        return res.status(400).json({
+          message: `Invalid model: "${candidateModel}". Please select a valid active model from available models.`,
+          success: false,
+          invalidModel: true,
+        });
       }
 
       chat = await Chat.create({
         userId: req.tokenData.id,
-        model: selectedModel,
+        model: validModel.modelId,
       });
+    }
+
+    const requestedModel = model ? model : chat.model;
+    let activeModelDoc = await AIModel.findOne({ modelId: requestedModel, isActive: true });
+    if (!activeModelDoc) {
+      await ensureDefaultModelsSeeded();
+      activeModelDoc = await AIModel.findOne({ modelId: requestedModel, isActive: true });
+    }
+
+    if (!activeModelDoc) {
+      return res.status(400).json({
+        message: `Invalid model: "${requestedModel}". Please select a valid active model from available models.`,
+        success: false,
+        invalidModel: true,
+      });
+    }
+
+    // Keep chat model up-to-date if a specific model was requested
+    if (model && chat.model !== activeModelDoc.modelId) {
+      chat.model = activeModelDoc.modelId;
     }
 
     const recentMessageHistory = await Message.find({ chatId: chat._id })

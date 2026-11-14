@@ -1,5 +1,6 @@
 import Message from "../models/message.model.js";
 import Chat from "../models/chat.model.js";
+import AIModel, { ensureDefaultModelsSeeded } from "../models/aiModel.model.js";
 import mongoose from "mongoose";
 // import { success } from "zod";
 import { generateAIResponse } from "../services/openrouter.service.js";
@@ -82,16 +83,44 @@ export const sendMessage = async (req, res) => {
         });
       }
     } else {
-      const selectedModel = model || process.env.DEFAULT_AI_MODEL;
-      if (!selectedModel) {
+      let candidateModel = model;
+      if (!candidateModel) {
+        const defaultDoc = await AIModel.findOne({ isDefault: true, isActive: true });
+        candidateModel = defaultDoc?.modelId || process.env.DEFAULT_AI_MODEL || "openrouter/free";
+      }
+
+      let validModel = await AIModel.findOne({ modelId: candidateModel, isActive: true });
+      if (!validModel) {
+        await ensureDefaultModelsSeeded();
+        validModel = await AIModel.findOne({ modelId: candidateModel, isActive: true });
+      }
+
+      if (!validModel) {
         return res.status(400).json({
-          message: "Model not provided.",
+          message: `Invalid model: "${candidateModel}". Please select a valid active model from available models.`,
           success: false,
+          invalidModel: true,
         });
       }
+
       chat = await Chat.create({
         userId: req.tokenData.id,
-        model: selectedModel,
+        model: validModel.modelId,
+      });
+    }
+
+    const activeModelId = model ? model : chat.model;
+    let validRequestedModel = await AIModel.findOne({ modelId: activeModelId, isActive: true });
+    if (!validRequestedModel) {
+      await ensureDefaultModelsSeeded();
+      validRequestedModel = await AIModel.findOne({ modelId: activeModelId, isActive: true });
+    }
+
+    if (!validRequestedModel) {
+      return res.status(400).json({
+        message: `Invalid model: "${activeModelId}". Please select a valid active model from available models.`,
+        success: false,
+        invalidModel: true,
       });
     }
 
@@ -107,7 +136,7 @@ export const sendMessage = async (req, res) => {
     });
 
     const { result, usage } = await generateAIResponse({
-      model: model ? model : chat.model,
+      model: validRequestedModel.modelId,
       messages: prepareMessage,
     });
 
