@@ -1,8 +1,8 @@
 import Chat from "../models/chat.model.js";
 import Message from "../models/message.model.js";
+import SharedChat from "../models/sharedChat.model.js";
 import AIModel, { ensureDefaultModelsSeeded } from "../models/aiModel.model.js";
-import mongoose  from "mongoose";
-
+import mongoose from "mongoose";
 
 export const getRecentChat = async (req, res) => {
   try {
@@ -32,11 +32,17 @@ export const createChat = async (req, res) => {
     }
 
     // Validate that the model exists and is active in the database
-    let validModel = await AIModel.findOne({ modelId: model.trim(), isActive: true });
+    let validModel = await AIModel.findOne({
+      modelId: model.trim(),
+      isActive: true,
+    });
     if (!validModel) {
       // If collection is not seeded yet, seed and check again
       await ensureDefaultModelsSeeded();
-      validModel = await AIModel.findOne({ modelId: model.trim(), isActive: true });
+      validModel = await AIModel.findOne({
+        modelId: model.trim(),
+        isActive: true,
+      });
     }
 
     if (!validModel) {
@@ -86,6 +92,7 @@ export const deleteChatByID = async (req, res) => {
         success: false,
       });
     }
+    await SharedChat.deleteMany({ chatId, userId });
     const deleteMessage = await Message.deleteMany({
       chatId: chatId,
       userId: req.tokenData.id,

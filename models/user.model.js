@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    avatar: { type: String, default: "", maxlength: 200000 },
+    personalization: { type: String, default: "", maxlength: 4000 },
     age: {
       type: Number,
     },
@@ -23,7 +25,7 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      default:null
+      default: null,
     },
     admin: {
       type: Boolean,
@@ -33,7 +35,7 @@ const userSchema = new mongoose.Schema(
       name: {
         type: String,
         enum: ["google", "github", "email"],
-      }
+      },
     },
 
     usage: {

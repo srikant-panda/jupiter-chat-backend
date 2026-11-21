@@ -10,6 +10,7 @@ import chatRouter from "./routes/chat.routes.js";
 import messageRouter from "./routes/message.routes.js";
 import modelRouter from "./routes/model.routes.js";
 import adminRouter from "./routes/admin.routes.js";
+import shareRouter from "./routes/share.routes.js";
 import { ensureDefaultModelsSeeded } from "./models/aiModel.model.js";
 import cors from "cors";
 
@@ -64,7 +65,7 @@ app.use(
     exposedHeaders: ["Authorization", "x-refresh-token"],
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
 // Behind a reverse proxy (Nginx/Render/Railway/etc.) the request arrives as
@@ -91,6 +92,7 @@ app.use("/api/chat/", chatRouter);
 app.use("/api/message/", messageRouter);
 app.use("/api/models/", modelRouter);
 app.use("/api/admin/", adminRouter);
+app.use("/api/share/", shareRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

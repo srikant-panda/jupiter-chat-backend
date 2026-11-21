@@ -18,7 +18,9 @@ export const authMiddleware = ({
 
       const token =
         type.trim().toLowerCase() === "refresh"
-          ? (req.cookies?.refreshToken || req.headers["x-refresh-token"] || bearerToken)
+          ? req.cookies?.refreshToken ||
+            req.headers["x-refresh-token"] ||
+            bearerToken
           : bearerToken;
       if (optionalAuth && !token) {
         req.tokenData = null;
@@ -38,23 +40,34 @@ export const authMiddleware = ({
       const tokenData = jwt.verify(token, config.JWT_SECRET);
       // console.log(tokenData.JTI);
       if (type.toLowerCase() === "refresh") {
-        const session = await Session.findOne({ JTI: tokenData.JTI }) || {};
+        const session = await Session.findOne({
+          JTI: tokenData.JTI,
+          owner: tokenData.id,
+        });
         // console.log(revoked);
-        if (!session || session.revoked )
+        if (!session || session.revoked || session.exipresAt <= new Date())
           return res
             .status(404)
             .json({ message: "Token not valid.", success: false });
-      };
+      }
       const user = await User.findById(tokenData.id);
-      if(!user) {
+      if (!user) {
         return res.status(404).json({
-          message:"User not exist.",
-          success:false
-        })
-      };
-      if (type.toLowerCase() !== "refresh" && !req.originalUrl?.includes("completeAuth")) {
+          message: "User not exist.",
+          success: false,
+        });
+      }
+      if (
+        type.toLowerCase() !== "refresh" &&
+        !req.originalUrl?.includes("completeAuth")
+      ) {
         if (!user.age) {
-          return res.status(422).json({ message: "Age is required. Please set your age before continuing." });
+          return res
+            .status(422)
+            .json({
+              message:
+                "Age is required. Please set your age before continuing.",
+            });
         }
       }
       req.token = token;

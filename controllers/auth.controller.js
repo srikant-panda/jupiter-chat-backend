@@ -37,9 +37,9 @@ export const signupController = async (req, res) => {
       email,
       age,
       password: hashPassword,
-      method:{
-        name:"email"
-      }
+      method: {
+        name: "email",
+      },
     });
     if (userCreated) {
       const { token: accessToken, JTI: accessTokenJTI } = createToken(
@@ -52,7 +52,7 @@ export const signupController = async (req, res) => {
         email,
         "7d",
       );
-      console.log(refreshToken);
+      // Never log session credentials.
       const isStored = await Session.create({
         JTI: refreshTokenJTI,
         owner: userCreated._id,
@@ -60,7 +60,14 @@ export const signupController = async (req, res) => {
       res.set("Authorization", `Bearer ${accessToken}`);
       // res.set("x-refresh-token", refreshToken);
       res.cookie("refreshToken", refreshToken, getCookieOptions(req));
-      res.status(201).json({ message: "User created.", success: true, accessToken, refreshToken });
+      res
+        .status(201)
+        .json({
+          message: "User created.",
+          success: true,
+          accessToken,
+          refreshToken,
+        });
     }
   } catch (err) {
     console.log(err);
@@ -112,7 +119,12 @@ export const loginController = async (req, res) => {
       });
       res.set("Authorization", `Bearer ${accessToken}`);
       res.cookie("refreshToken", refreshToken, getCookieOptions(req));
-      res.json({ message: "User logged in.", success: true, accessToken, refreshToken });
+      res.json({
+        message: "User logged in.",
+        success: true,
+        accessToken,
+        refreshToken,
+      });
     }
   } catch (err) {
     console.log(err);
@@ -172,7 +184,11 @@ export const refreshController = async (req, res) => {
 
     // res.cookie("refreshToken",newRefreshToken,cookieOptions);
     res.header("Authorization", `Bearer ${newaccessToken}`);
-    res.json({ message: "Token refreshed.", success: true, accessToken: newaccessToken });
+    res.json({
+      message: "Token refreshed.",
+      success: true,
+      accessToken: newaccessToken,
+    });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Internal server error." });

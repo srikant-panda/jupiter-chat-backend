@@ -1,21 +1,24 @@
+import User from "../models/user.model.js";
 export const resetTokenUsageIfNeeded = async (user) => {
-  const now = new Date();
-
-  if (now > user.usage.resetAt) {
-    user.usage.tokenUsed = 0;
-    user.usage.resetAt = new Date(Date.now() + 5 * 60 * 60 * 1000);
-    await user.save();
-  }
+  const updated = await User.findOneAndUpdate(
+    { _id: user._id, "usage.resetAt": { $lte: new Date() } },
+    {
+      $set: {
+        "usage.tokenUsed": 0,
+        "usage.resetAt": new Date(Date.now() + 5 * 60 * 60 * 1000),
+      },
+    },
+    { returnDocument: "after" },
+  );
+  if (updated) user.usage = updated.usage;
 };
-
-export const isUsageLimitExceeded = (user) => {
-  return user.usage.tokenUsed >= user.usage.tokenLimit
+export const isUsageLimitExceeded = (user) =>
+  user.usage.tokenUsed >= user.usage.tokenLimit;
+export const updateUserTokenUsage = async (user, usage) => {
+  const total = usage?.totalTokens || 0;
+  await User.updateOne(
+    { _id: user._id },
+    { $inc: { "usage.tokenUsed": total, "usage.totalTokenUsed": total } },
+  );
+  return true;
 };
-
-export const  updateUserTokenUsage = async (user , usage) =>{      // Here we add the each message total token.
-  user.usage.tokenUsed += usage?.totalTokens;
-  user.usage.totalTokenUsed += usage?.totalTokens;
-  await user.save();
-  return true
-}
-

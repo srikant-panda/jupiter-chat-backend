@@ -1,46 +1,55 @@
-import { Chat } from "openai/resources.js";
 import Message from "../models/message.model.js";
+import Chat from "../models/chat.model.js";
 import User from "../models/user.model.js";
+import Session from "../models/auth.model.js";
+import SharedChat from "../models/sharedChat.model.js";
+import { getCookieOptions } from "../utils/jwtAndCookie.utils.js";
+import { profileSchema } from "../validators/profile.schema.js";
+import { normalizeAvatar } from "../services/avatar.service.js";
 
-export const getMe = async (req, res) => {
-  const { id: userId } = req.tokenData;
-  const user = await User.findById(userId);
-  if (!user)
-    return res.status(404).json({ message: "User not found.", success: false });
-  res.json({
-    message: "User fetched successfully.",
-    data: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      usage: user.usage,
-      admin: Boolean(user.admin === true || user.isAdmin === true),
-    },
-  });
-};
-
-export const deleteUser = async (req, res) => {
-  try {
-    const deleteMessages = await Message.deleteMany({ userId:req.tokenData.id });
-    if(deleteMessages.deletedCount !== 0){
-      const deleteChats = await Chat.deleteMany({ userID:req.tokenData.id });
-      if(deleteChats.deletedCount !== 0){
-        const deleteUser = await User.findByIdAndDelete(req.tokenData.id);
-
-        res.clearCookie("refreshToken",{
-          httpOnly:true,
-          secure:false
-        })
-        res.json({
-          message:"User deleted.",
-          success:true
-        })
-      }
+const publicProfile = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  avatar: user.avatar || "",
+  personalization: user.personalization || "",
+  usage: user.usage,
+  admin: user.admin === true,
+});
+export const getMe = async (req, res) =>
+  res.json({ data: publicProfile(req.user) });
+export async function updateProfile(req, res) {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success)
+    return res.status(400).json({ message: parsed.error.issues[0].message });
+  const values = parsed.data;
+  if (values.avatar !== undefined) {
+    try {
+      values.avatar = await normalizeAvatar(values.avatar);
+    } catch {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Upload a valid PNG, JPEG or WebP image under 600 KB (maximum 16 megapixels).",
+        });
     }
-  } catch (err) {
-    console.log(err);
-    return res.status(500).json({
-      message:"Internal server error"
-    });
   }
+  const user = await User.findByIdAndUpdate(
+    req.tokenData.id,
+    { $set: values },
+    { returnDocument: "after", runValidators: true },
+  );
+  if (!user) return res.status(404).json({ message: "User not found." });
+  res.json({ success: true, data: publicProfile(user) });
+}
+export const deleteUser = async (req, res) => {
+  const userId = req.tokenData.id;
+  await SharedChat.deleteMany({ userId });
+  await Session.deleteMany({ owner: userId });
+  await Message.deleteMany({ userId });
+  await Chat.deleteMany({ userId });
+  await User.findByIdAndDelete(userId);
+  res.clearCookie("refreshToken", getCookieOptions(req));
+  res.json({ success: true, message: "Account deleted." });
 };

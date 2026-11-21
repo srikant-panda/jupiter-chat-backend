@@ -50,7 +50,7 @@ jupiter-chat-backend/
 
 ### Requirements
 
-- Node.js 18+
+- Node.js 20.19+
 - MongoDB
 - OpenRouter API key and/or supported AI provider credentials
 
@@ -285,3 +285,46 @@ For a cleaner production setup, use a custom domain and reverse proxy so the fro
 ## License
 
 No license file is currently included. Add a `LICENSE` file if you intend to distribute Jupiter Chat publicly.
+
+## Structured answers, temporary chats, sharing and profiles
+
+Chat responses now use a validated JSON schema with `title` and `answer` strings.
+The answer contains organized Markdown; the JSON wrapper is never rendered in the
+chat. Streaming decodes only the answer string, including partial escaped Unicode.
+The first successful answer replaces the initial question excerpt with a short
+LLM-generated title (up to eight words / 60 characters). Existing titled history
+is preserved. Summary generation keeps its separate plain-text format.
+
+`services/answer.service.js` requests OpenRouter structured output and keeps web
+search enabled. If a provider explicitly rejects structured output or web search,
+that capability is removed for a bounded retry; output is still validated. Models
+that cannot return the schema produce an error rather than displaying raw JSON.
+Authentication and quota errors are not retried as capability failures.
+
+- `POST /api/message/stream` and `POST /api/message` accept `temporary: true` and a
+  bounded `history` array of user/assistant messages. Temporary requests never
+  create Chat, Message or SharedChat records. Normal account usage is still charged;
+  providers receive the conversation, and profile preferences still apply.
+- `PATCH /api/user/profile` accepts `name`, `personalization` (up to 4,000 characters)
+  and optional `avatar` (a PNG/JPEG/WebP data URL under 600 KB). Images are decoded,
+  resized to 256×256 and re-encoded as JPEG without original metadata. Unknown
+  fields, including account privileges, are rejected.
+- `POST /api/share/chat/:chatId` creates or returns an owner's fixed snapshot.
+  Reusing a link does not add future messages; revoke it to create a fresh snapshot.
+- `GET /api/share` lists the signed-in user's links; `DELETE /api/share/:token`
+  revokes an owned link. Deleting the source chat/account also removes shares.
+- `GET /api/share/:token` is public and returns only title, user/assistant content
+  and snapshot date. Tokens are random 256-bit capabilities; responses are not
+  cached and carry no-index/no-referrer headers. Anyone with a link can copy it.
+- `DELETE /api/user/` deletes the authenticated account and associated data.
+
+Profile text and summaries are explicitly lower-trust user context, never inserted
+as system instructions. Temporary history cannot contain privileged message roles.
+These boundaries reduce prompt-injection risk; they cannot guarantee immunity.
+No tool in this chat pipeline grants the model account, filesystem or database access.
+
+Run `npm test` for schema/stream decoding, provider fallback, avatar normalization,
+authentication, temporary storage, title persistence, profile and sharing tests.
+Integration tests start an isolated MongoDB memory server and mock the AI provider;
+they never connect to the configured application database. The first run may download
+a MongoDB test binary. These tests do not verify live provider compatibility.
