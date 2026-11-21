@@ -17,7 +17,7 @@ export const responseFormat = {
         answer: {
           type: "string",
           description:
-            "The complete, detailed answer in Markdown. Use descriptive headings, clear explanations, concrete examples, steps and relevant caveats. Include code or Mermaid diagrams when useful. Answer the actual question; avoid filler and do not expose internal reasoning.",
+            "The complete, detailed answer in Markdown. Use descriptive headings, clear explanations, concrete examples, steps and relevant caveats. Include code or D2 diagrams (fenced with d2) when useful. Answer the actual question; avoid filler and do not expose internal reasoning.",
         },
       },
       required: ["title", "answer"],

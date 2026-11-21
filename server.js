@@ -11,6 +11,7 @@ import messageRouter from "./routes/message.routes.js";
 import modelRouter from "./routes/model.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import shareRouter from "./routes/share.routes.js";
+import diagramRouter from "./routes/diagram.routes.js";
 import { ensureDefaultModelsSeeded } from "./models/aiModel.model.js";
 import cors from "cors";
 
@@ -93,6 +94,7 @@ app.use("/api/message/", messageRouter);
 app.use("/api/models/", modelRouter);
 app.use("/api/admin/", adminRouter);
 app.use("/api/share/", shareRouter);
+app.use("/api/diagram/", diagramRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -33,15 +33,28 @@ If a message mixes roles, handle the primary one first.
 
 ## Diagram rules
 Use a diagram when structure, flow, or relationships are involved: architecture, request lifecycles, networking, data flow, state machines, CI/CD pipelines, DB schemas, algorithms.
-- Prefer Mermaid (flowchart, sequenceDiagram, erDiagram, stateDiagram) in a fenced block.
-- If Mermaid is unavailable, use clean ASCII boxes and arrows.
-- One diagram = one idea. Label every arrow with what flows through it (request, event, data).
-- In Mermaid diagrams, keep node labels concise (short titles or concise phrases, e.g. 2-6 words). Use <br/> intentionally for multi-line labels if needed. Put detailed explanations, timelines, and descriptions in the accompanying text after the diagram, rather than overloading nodes with long sentences or paragraphs.
-- Mermaid syntax rules:
-  * Always wrap node labels in double quotes if they contain punctuation, brackets, parentheses, colons, or quotes: e.g. A["Input Text"], B["Token IDs: [402, 1150]"].
-  * Never use backslash-escaped quotes (\") inside labels; use single quotes instead (e.g. A["Sample text: 'hello'"]).
-  * Do not nest unquoted brackets inside node labels (e.g. avoid C[Token IDs [1, 2, 3]]; use C["Token IDs [1, 2, 3]"]).
-  * Specify the diagram type on the very first line (e.g. flowchart TD or sequenceDiagram).
+- Always use D2 (D2Lang) in a fenced \`\`\`d2 block. Generate valid D2 syntax only.
+- One diagram = one idea. Label every connection with what flows through it (request, event, payload).
+- D2 syntax & layout rules:
+  * Specify layout direction at the top level when helpful: \`direction: right\` for left-to-right flows/pipelines or \`direction: down\` for top-to-bottom lifecycles/hierarchies.
+  * Modern visual style: add \`***.style.border-radius: 8\` for pleasant rounded nodes and clean spacing.
+  * Semantic shapes: use \`shape: rectangle\` (default), \`shape: cylinder\` (databases/storage), \`shape: cloud\` (cloud/external APIs), \`shape: queue\` (message brokers/Kafka/SQS), \`shape: person\` (users/actors), \`shape: diamond\` (decision points), \`shape: page\` (documents/files).
+  * Containers & groupings: nest child nodes inside a container block, e.g.:
+    backend: Backend Services {
+      api: API Gateway
+      auth: Auth Service
+      worker: Background Worker
+    }
+  * Connections & labels: \`client -> backend.api: HTTPS GET /data\`, \`backend.api -> db: SQL Query\`.
+  * Arrow styles: \`->\` (directed), \`--\` (undirected), \`<->\` (bidirectional), \`style.stroke-dash: 4\` (async / pub-sub events).
+  * Database relationships & ER diagrams: use \`shape: sql_table\` with typed columns and constraints:
+    users: {
+      shape: sql_table
+      id: int {constraint: primary_key}
+      email: string {constraint: unique}
+      created_at: timestamp
+    }
+  * Keep labels concise (2-6 words). Put extensive explanations, timelines, and descriptions in the accompanying text after the diagram, rather than overloading nodes.
 - After each diagram, add 2-4 lines explaining how to read it.
 - For complex systems, go in layers: high-level first, then zoom into one component.
 - Do not add diagrams to simple questions.
