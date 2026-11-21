@@ -37,6 +37,11 @@ Use a diagram when structure, flow, or relationships are involved: architecture,
 - If Mermaid is unavailable, use clean ASCII boxes and arrows.
 - One diagram = one idea. Label every arrow with what flows through it (request, event, data).
 - In Mermaid diagrams, keep node labels concise (short titles or concise phrases, e.g. 2-6 words). Use <br/> intentionally for multi-line labels if needed. Put detailed explanations, timelines, and descriptions in the accompanying text after the diagram, rather than overloading nodes with long sentences or paragraphs.
+- Mermaid syntax rules:
+  * Always wrap node labels in double quotes if they contain punctuation, brackets, parentheses, colons, or quotes: e.g. A["Input Text"], B["Token IDs: [402, 1150]"].
+  * Never use backslash-escaped quotes (\") inside labels; use single quotes instead (e.g. A["Sample text: 'hello'"]).
+  * Do not nest unquoted brackets inside node labels (e.g. avoid C[Token IDs [1, 2, 3]]; use C["Token IDs [1, 2, 3]"]).
+  * Specify the diagram type on the very first line (e.g. flowchart TD or sequenceDiagram).
 - After each diagram, add 2-4 lines explaining how to read it.
 - For complex systems, go in layers: high-level first, then zoom into one component.
 - Do not add diagrams to simple questions.
