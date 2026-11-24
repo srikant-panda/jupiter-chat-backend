@@ -258,6 +258,36 @@ test("web search is retained unless explicitly unsupported; nonstream fallback r
   assert.equal(calls, 2);
 });
 
+test("Tool choice conflict error ('Tool choice is none, but model called a tool') strips tools and retries seamlessly", async () => {
+  let calls = 0;
+  const client = {
+    chat: {
+      send: async ({ chatRequest }) => {
+        calls++;
+        if (calls === 1) {
+          assert.equal(chatRequest.toolChoice, "auto");
+          assert.ok(chatRequest.tools?.length > 0);
+          throw new Error("Tool choice is none, but model called a tool");
+        }
+        assert.equal(chatRequest.tools, undefined);
+        assert.equal(chatRequest.toolChoice, undefined);
+        return {
+          choices: [
+            {
+              message: {
+                content: '{"title":"Retried","answer":"Answer succeeded without tools"}',
+              },
+            },
+          ],
+        };
+      },
+    },
+  };
+  const result = await generateAnswer({ model: "fake", messages: [], client, webSearch: true });
+  assert.equal(calls, 2);
+  assert.equal(result.result, "Answer succeeded without tools");
+});
+
 test("parseRobustAnswer handles flexible AI provider responses and intercepts API errors", () => {
   // 1. Flexible response with status and message (common variation)
   const res1 = parseRobustAnswer(JSON.stringify({ status: "success", message: "Hello! How can I help you today?" }));
