@@ -141,6 +141,7 @@ export async function generateAnswer({
               },
             },
           ],
+          toolChoice: "auto",
         }
       : {}),
   };
@@ -243,11 +244,12 @@ export async function generateAnswer({
       }
       if (
         chatRequest.tools &&
-        /(?:tools?|web.?search).*?(?:not support|unsupported|not available)|(?:not support|unsupported).*?(?:tools?|web.?search)/i.test(
+        /(?:tools?|web.?search).*?(?:not support|unsupported|not available)|(?:not support|unsupported).*?(?:tools?|web.?search)|tool.*?choice|called a tool/i.test(
           err.message || "",
         )
       ) {
         delete chatRequest.tools;
+        delete chatRequest.toolChoice;
         continue;
       }
       if (

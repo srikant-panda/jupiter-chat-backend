@@ -1,6 +1,7 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
 import { OpenRouter } from "@openrouter/sdk";
+import { devWarn } from "../../utils/logger.js";
 import {
   createStreamReasoningFilter,
   extractThinkReasoning,
@@ -75,18 +76,40 @@ export class OpenRouterProvider extends BaseProvider {
       });
     }
 
+    const hasTools = activeTools.length > 0;
     const chatRequest = {
       model,
       messages,
       stream: Boolean(stream),
       ...(responseFormat ? { responseFormat } : {}),
-      ...(activeTools.length > 0 ? { tools: activeTools } : {}),
+      ...(hasTools ? { tools: activeTools, toolChoice: "auto" } : {}),
     };
 
-    const response = await client.chat.send({
-      chatRequest,
-      options: signal ? { signal } : undefined,
-    });
+    let response;
+    try {
+      response = await client.chat.send({
+        chatRequest,
+        options: signal ? { signal } : undefined,
+      });
+    } catch (err) {
+      // If upstream model rejects tool calling (e.g. "Tool choice is none, but model called a tool" or tools unsupported)
+      if (
+        chatRequest.tools &&
+        /(?:tool.*?choice|tools?.*?not support|attempted to call tool|unsupported.*?tool|called a tool)/i.test(
+          err.message || ""
+        )
+      ) {
+        devWarn(`[OpenRouter] Tool calling rejected (${err.message}). Retrying in text-only mode...`);
+        delete chatRequest.tools;
+        delete chatRequest.toolChoice;
+        response = await client.chat.send({
+          chatRequest,
+          options: signal ? { signal } : undefined,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
