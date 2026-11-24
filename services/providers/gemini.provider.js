@@ -11,6 +11,7 @@ export class GeminiProvider extends BaseProvider {
     keys = process.env.GEMINI_API_KEY || "",
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
     freeModel = process.env.GEMINI_FREE_MODEL || "gemini-2.0-flash",
+    models = process.env.GEMINI_MODELS || [],
     weight = 2,
   } = {}) {
     super({
@@ -20,12 +21,13 @@ export class GeminiProvider extends BaseProvider {
         keys,
         cooldownHours,
       }),
+      modelPool: models,
       defaultFreeModel: freeModel,
       weight,
     });
   }
 
-  async chat({
+  async executeChat({
     model,
     messages,
     stream = false,

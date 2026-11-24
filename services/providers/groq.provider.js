@@ -10,7 +10,8 @@ export class GroqProvider extends BaseProvider {
   constructor({
     keys = process.env.GROQ_API_KEY || "",
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
-    freeModel = process.env.GROQ_FREE_MODEL || "openai/gpt-oss-120b",
+    freeModel = process.env.GROQ_FREE_MODEL || "llama-3.3-70b-versatile",
+    models = process.env.GROQ_MODELS || [],
     weight = 2,
   } = {}) {
     super({
@@ -20,12 +21,13 @@ export class GroqProvider extends BaseProvider {
         keys,
         cooldownHours,
       }),
+      modelPool: models,
       defaultFreeModel: freeModel,
       weight,
     });
   }
 
-  async chat({
+  async executeChat({
     model,
     messages,
     stream = false,
