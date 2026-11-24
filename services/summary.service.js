@@ -1,20 +1,15 @@
-import openRouter from "../config/openrouter.js";
 import Chat from "../models/chat.model.js";
 import Message from "../models/message.model.js";
 import User from "../models/user.model.js";
 import { generateAIResponse } from "./openrouter.service.js";
 import { chatTokenUsage } from "../utils/tokenUsage.js";
-import { updateUserTokenUsage } from "../utils/userUsage.js"
+import { updateUserTokenUsage } from "../utils/userUsage.js";
 
 const SUMMARY_CHUNK_SIZE = 20;
 
 export const updateSummaryIfNeeded = async (chatId) => {
   const chat = await Chat.findById(chatId);
   if (!chat) return;
-  //   const messagesForSummary = await Message.find({ chatId:chat._id }).select("role content")
-  //     .skip(chat.summarizedTillMessageNumber)
-  // .limit(SUMMARY_CHUNK_SIZE);   This will query the database even if we do not have the sufficient message for summarize like if we have only 1,2,3,4....20 message.
-  //   if( chat.messageCount <= SUMMARY_CHUNK_SIZE ) return; if is also a inefficient way bcz it will always true if we have 22 message bcz we dont want to again summary the 2 messag.
   const unsummarizedMessage =
     chat.messageCount - chat.summarizedTillMessageNumber;
   if (unsummarizedMessage < SUMMARY_CHUNK_SIZE) return;

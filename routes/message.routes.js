@@ -1,24 +1,3 @@
-// import { Router } from "express"; 
-// import { authMiddleware } from "../middlewares/auth.middleware.js";
-// import { getMessage,sendMessage } from "../controllers/message.controller.js";
-
-
-// const messageRouter = Router();
-
-// /**
-//  * 1- getMessage
-//  * 2- sendMessage
-//  */
-// messageRouter.use(authMiddleware())
-
-// messageRouter.get("/:chatId",getMessage);
-// messageRouter.post("/:chatId",sendMessage);
-// messageRouter.post("/",sendMessage)
-
-// export default messageRouter;
-
-
-
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { getMessage, sendMessage } from "../controllers/message.controller.js";

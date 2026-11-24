@@ -1,17 +1,12 @@
 import User from "../models/user.model.js";
 import Session from "../models/auth.model.js";
 import bcrypt from "bcrypt";
-import { config } from "../config/config.js";
 import { signupSchema, signinSchema } from "../validators/user.schema.js";
 import { createToken, getCookieOptions } from "../utils/jwtAndCookie.utils.js";
 
 export const signupController = async (req, res) => {
   try {
-    // const { email, password, name, age } = req.body;
-    // console.log("recieved")
-    // console.log(req.body)
     const result = signupSchema.safeParse(req.body);
-    // console.log(result);
     if (!result.success) {
       return res.status(400).json({
         errors: result.error.issues,
@@ -159,30 +154,12 @@ export const logoutCotroller = async (req, res) => {
 
 export const refreshController = async (req, res) => {
   try {
-    // const old_JTI = req.tokenData.JTI;
-
-    // const isRevoked = await Session.findOneAndUpdate(
-    //   { JTI: old_JTI },
-    //   { revoked: true },
-    // );
-    // const user = await User.findById(req.tokenData.id);
-    // const { token: newRefreshToken, JTI: newRefreshJTI } = createToken(
-    //   req.tokenData.id,
-    //   user.email,
-    //   "7d",
-    // );
     const { token: newaccessToken } = createToken(
       req.tokenData.id,
       req.user.email,
       "15m",
     );
 
-    // const session = await Session.create({
-    //   JTI: newRefreshJTI,
-    //   owner: req.tokenData.id,
-    // });
-
-    // res.cookie("refreshToken",newRefreshToken,cookieOptions);
     res.header("Authorization", `Bearer ${newaccessToken}`);
     res.json({
       message: "Token refreshed.",

@@ -1,12 +1,3 @@
-// getRecentChats  : Top 20
-
-//getSingleChat
-
-//createChat
-
-//deleteChat
-
-
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { getRecentChat,getChatById,deleteChatByID,createChat }  from "../controllers/chat.controller.js";
