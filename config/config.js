@@ -41,6 +41,10 @@ export const config = {
     process.env.OPENROUTER_FREE_MODEL || "openrouter/free",
   GROQ_FREE_MODEL: process.env.GROQ_FREE_MODEL || "llama-3.3-70b-versatile",
   GEMINI_FREE_MODEL: process.env.GEMINI_FREE_MODEL || "gemini-2.0-flash",
+  // Multi-provider order for Auto (Multi-Provider): Groq first, then OpenRouter, then Gemini
+  PROVIDER_ORDER: parseKeys(process.env.PROVIDER_ORDER).length > 0
+    ? parseKeys(process.env.PROVIDER_ORDER)
+    : ["groq", "openrouter", "gemini"],
   // Model pools: empty by default; user fills in desired fallback models in env
   OPENROUTER_MODELS: parseKeys(process.env.OPENROUTER_MODELS),
   GROQ_MODELS: parseKeys(process.env.GROQ_MODELS),

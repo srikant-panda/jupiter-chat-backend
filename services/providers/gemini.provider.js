@@ -12,7 +12,7 @@ export class GeminiProvider extends BaseProvider {
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
     freeModel = process.env.GEMINI_FREE_MODEL || "gemini-2.0-flash",
     models = process.env.GEMINI_MODELS || [],
-    weight = 2,
+    weight = 1,
   } = {}) {
     super({
       name: "gemini",

@@ -72,6 +72,42 @@ export class FreeRouterService {
   }
 
   /**
+   * Orders candidate providers for automatic multi-provider execution.
+   * Default order: Groq first, then OpenRouter, then Gemini.
+   * Can be customized via PROVIDER_ORDER env (e.g. "groq,openrouter,gemini").
+   */
+  orderCandidateProviders(availableProviders) {
+    if (!availableProviders || availableProviders.length <= 1) {
+      return availableProviders || [];
+    }
+
+    const preferredOrder = (
+      process.env.PROVIDER_ORDER
+        ? process.env.PROVIDER_ORDER.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+        : ["groq", "openrouter", "gemini"]
+    );
+
+    const ordered = [];
+    for (const name of preferredOrder) {
+      const match = availableProviders.find(
+        (p) => (p.name || "").toLowerCase() === name
+      );
+      if (match && !ordered.includes(match)) {
+        ordered.push(match);
+      }
+    }
+
+    // Append any remaining available providers
+    for (const p of availableProviders) {
+      if (!ordered.includes(p)) {
+        ordered.push(p);
+      }
+    }
+
+    return ordered.length > 0 ? ordered : availableProviders;
+  }
+
+  /**
    * Generates answer using the free tier with timeout cancellation and auto-failover.
    */
   async generateFreeAnswer({ messages, onToken = null, timeoutMs = null }) {
@@ -86,12 +122,8 @@ export class FreeRouterService {
       );
     }
 
-    // Order candidate providers starting with the WRR chosen one, followed by others for failover
-    const firstProvider = this.pickNextProvider(available);
-    const candidateQueue = [
-      firstProvider,
-      ...available.filter((p) => p.name !== firstProvider.name),
-    ];
+    // Order candidate providers: groq first, then openrouter, then gemini
+    const candidateQueue = this.orderCandidateProviders(available);
 
     let lastError = null;
 
