@@ -5,7 +5,7 @@ import freeRouterService from "./freeRouter.service.js";
  * Generates non-streaming AI completions for internal background services (such as conversation summaries).
  */
 export const generateAIResponse = async ({ model, provider: providerHint, messages }) => {
-  if (model === "free" || model === "openrouter/free" || providerHint === "Auto (Multi-Provider)") {
+  if (model === "free" || providerHint === "Auto (Multi-Provider)") {
     const freeRes = await freeRouterService.generateFreeAnswer({ messages });
     return {
       result: freeRes.result,

@@ -39,8 +39,7 @@ export const getModelById = asyncHandler(async (req, res) => {
 
   // Support encoded slashes (e.g., openai/gpt-4o-mini)
   const decodedModelId = decodeURIComponent(modelId);
-  const normalizedId =
-    decodedModelId === "openrouter/free" ? "free" : decodedModelId;
+  const normalizedId = decodedModelId;
 
   const model = await AIModel.findOne({
     modelId: normalizedId,

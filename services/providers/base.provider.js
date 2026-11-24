@@ -60,7 +60,7 @@ export class BaseProvider {
     const cleanRequested = (requestedModel || "").trim();
     const candidates = [];
 
-    if (cleanRequested && cleanRequested !== "free" && cleanRequested !== "openrouter/free") {
+    if (cleanRequested && cleanRequested !== "free") {
       candidates.push(cleanRequested);
     } else if (this.defaultFreeModel) {
       candidates.push(this.defaultFreeModel);

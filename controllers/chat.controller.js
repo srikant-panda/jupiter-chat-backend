@@ -26,8 +26,7 @@ export const createChat = asyncHandler(async (req, res) => {
   }
 
   const requestedModel = model.trim();
-  const normalizedModelId =
-    requestedModel === "openrouter/free" ? "free" : requestedModel;
+  const normalizedModelId = requestedModel;
 
   // Validate that the model exists and is active in the database
   let validModel = await AIModel.findOne({
