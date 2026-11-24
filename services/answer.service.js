@@ -10,8 +10,12 @@ import {
   createAnswerDecoder,
   unsupportedFormat,
 } from "../utils/responseSchema.js";
+import {
+  createStreamReasoningFilter,
+  extractThinkReasoning,
+} from "../utils/reasoningParser.js";
 
-async function executeCustomProvider({ provider, model, messages, onToken }) {
+async function executeCustomProvider({ provider, model, messages, onToken, onReasoning }) {
   const decode = createAnswerDecoder();
   const chunks = [];
   let tokensEmitted = false;
@@ -25,6 +29,7 @@ async function executeCustomProvider({ provider, model, messages, onToken }) {
       messages: chatMessages,
       stream: Boolean(onToken),
       responseFormat: reqFormat,
+      onReasoning,
       onToken: onToken
         ? async (delta) => {
             chunks.push(delta);
@@ -43,6 +48,7 @@ async function executeCustomProvider({ provider, model, messages, onToken }) {
         model,
         messages: chatMessages,
         stream: Boolean(onToken),
+        onReasoning,
         onToken: onToken
           ? async (delta) => {
               chunks.push(delta);
@@ -68,6 +74,7 @@ async function executeCustomProvider({ provider, model, messages, onToken }) {
 
   return {
     ...parsed,
+    reasoning: response.reasoning || "",
     usage: response.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
     provider: provider.name,
     model,
@@ -79,6 +86,7 @@ export async function generateAnswer({
   provider: providerHint,
   messages,
   onToken,
+  onReasoning,
   client = openRouter,
 }) {
   if (
@@ -86,7 +94,7 @@ export async function generateAnswer({
     model === "openrouter/free" ||
     providerHint === "Auto (Multi-Provider)"
   ) {
-    return freeRouterService.generateFreeAnswer({ messages, onToken });
+    return freeRouterService.generateFreeAnswer({ messages, onToken, onReasoning });
   }
 
   const { provider, model: targetModel } = providerRegistry.resolveProviderForModel(
@@ -107,6 +115,7 @@ export async function generateAnswer({
       model: targetModel,
       messages,
       onToken,
+      onReasoning,
     });
   }
   const chatRequest = {
@@ -141,6 +150,7 @@ export async function generateAnswer({
   // output is validated by the same schema. Authentication/quota errors never retry.
   for (let attempt = 0; attempt < 4; attempt++) {
     let raw = "";
+    let reasoningAccum = "";
     const chunks = [];
     let size = 0;
     const decode = createAnswerDecoder();
@@ -156,6 +166,16 @@ export async function generateAnswer({
               new Error(chunk.error.message || "Provider failed"),
               { status: chunk.error.code },
             );
+
+          const reasoningDelta =
+            chunk.choices?.[0]?.delta?.reasoning ||
+            chunk.choices?.[0]?.delta?.reasoning_content ||
+            "";
+          if (reasoningDelta) {
+            reasoningAccum += reasoningDelta;
+            if (onReasoning) await onReasoning(reasoningDelta);
+          }
+
           const content = chunk.choices?.[0]?.delta?.content || "";
           chunks.push(content);
           size += content.length;
@@ -171,14 +191,24 @@ export async function generateAnswer({
         raw = chunks.join("");
         track(latestUsage);
       } else {
-        const content = response.choices?.[0]?.message?.content;
+        const choice = response.choices?.[0]?.message;
+        const content = choice?.content;
         raw = Array.isArray(content)
           ? content
               .map((p) => (typeof p === "string" ? p : p.text || ""))
               .join("")
           : content || "";
+        reasoningAccum =
+          choice?.reasoning || choice?.reasoning_content || "";
         track(response.usage);
       }
+
+      if (!reasoningAccum && raw.includes("<think>")) {
+        const extracted = extractThinkReasoning(raw);
+        raw = extracted.content;
+        reasoningAccum = extracted.reasoning;
+      }
+
       let parsed;
       try {
         parsed = parseAnswer(raw);
@@ -191,7 +221,7 @@ export async function generateAnswer({
       if (onToken && !emitted && parsed.result) {
         await onToken(parsed.result);
       }
-      return { ...parsed, usage };
+      return { ...parsed, reasoning: reasoningAccum, usage };
     } catch (err) {
       if (emitted)
         throw new Error(

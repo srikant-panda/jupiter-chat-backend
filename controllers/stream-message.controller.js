@@ -120,11 +120,12 @@ async function respond(req, res, streaming) {
       }, 15000);
       res.on("close", () => clearInterval(heartbeat));
     }
-    const { result, title, usage } = await generateAnswer({
+    const { result, reasoning, title, usage } = await generateAnswer({
       model: modelId,
       provider: modelDoc?.provider,
       messages: prepared,
       onToken: streaming ? (text) => event(res, "token", { text }) : undefined,
+      onReasoning: streaming ? (text) => event(res, "reasoning", { text }) : undefined,
     });
     let assistantMessage;
     if (!temporary) {
@@ -133,6 +134,7 @@ async function respond(req, res, streaming) {
         chatId: chat._id,
         role: "assistant",
         content: result,
+        reasoning: reasoning || "",
         tokens: usage.completionTokens,
         usage,
       });
@@ -178,6 +180,7 @@ async function respond(req, res, streaming) {
       messageId: assistantMessage?._id || null,
       role: "assistant",
       reply: result,
+      reasoning: reasoning || "",
       usage,
       topic: chat?.topic || title,
       messageCount: chat?.messageCount || history.length + 2,

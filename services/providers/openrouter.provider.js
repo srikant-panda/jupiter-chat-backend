@@ -1,6 +1,10 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
 import { OpenRouter } from "@openrouter/sdk";
+import {
+  createStreamReasoningFilter,
+  extractThinkReasoning,
+} from "../../utils/reasoningParser.js";
 
 /**
  * OpenRouterProvider wraps OpenRouter API calls with multi-key pool support.
@@ -34,6 +38,7 @@ export class OpenRouterProvider extends BaseProvider {
     messages,
     stream = false,
     onToken = null,
+    onReasoning = null,
     signal = null,
     responseFormat = null,
     tools = null,
@@ -45,6 +50,7 @@ export class OpenRouterProvider extends BaseProvider {
         messages,
         stream,
         onToken,
+        onReasoning,
         signal,
         responseFormat,
         tools,
@@ -54,7 +60,7 @@ export class OpenRouterProvider extends BaseProvider {
 
   async _executeWithClient(
     client,
-    { model, messages, stream, onToken, signal, responseFormat, tools }
+    { model, messages, stream, onToken, onReasoning, signal, responseFormat, tools }
   ) {
     const chatRequest = {
       model,
@@ -72,7 +78,8 @@ export class OpenRouterProvider extends BaseProvider {
     const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
     if (stream) {
-      let raw = "";
+      const filter = createStreamReasoningFilter({ onToken, onReasoning });
+
       for await (const chunk of response) {
         if (signal?.aborted) {
           throw new Error("Request aborted by timeout or client.");
@@ -83,10 +90,19 @@ export class OpenRouterProvider extends BaseProvider {
           throw err;
         }
 
+        // 1. Direct reasoning delta from OpenRouter
+        const reasoningDelta =
+          chunk.choices?.[0]?.delta?.reasoning ||
+          chunk.choices?.[0]?.delta?.reasoning_content ||
+          "";
+        if (reasoningDelta) {
+          await filter.handleReasoning(reasoningDelta);
+        }
+
+        // 2. Content delta (may contain inline <think> tags)
         const delta = chunk.choices?.[0]?.delta?.content || "";
         if (delta) {
-          raw += delta;
-          if (onToken) await onToken(delta);
+          await filter.handleContent(delta);
         }
 
         if (chunk.usage) {
@@ -98,12 +114,26 @@ export class OpenRouterProvider extends BaseProvider {
             usage.promptTokens + usage.completionTokens;
         }
       }
-      return { raw, usage, streamed: true };
+
+      const { raw, reasoning } = await filter.flush();
+      return { raw, reasoning, usage, streamed: true };
     } else {
-      const content = response.choices?.[0]?.message?.content;
-      const raw = Array.isArray(content)
-        ? content.map((p) => (typeof p === "string" ? p : p.text || "")).join("")
-        : content || "";
+      const choice = response.choices?.[0]?.message;
+      let raw = "";
+      if (Array.isArray(choice?.content)) {
+        raw = choice.content.map((p) => (typeof p === "string" ? p : p.text || "")).join("");
+      } else {
+        raw = choice?.content || "";
+      }
+
+      let reasoning =
+        choice?.reasoning || choice?.reasoning_content || "";
+
+      if (!reasoning && raw.includes("<think>")) {
+        const extracted = extractThinkReasoning(raw);
+        raw = extracted.content;
+        reasoning = extracted.reasoning;
+      }
 
       if (response.usage) {
         usage.promptTokens = response.usage.promptTokens || 0;
@@ -112,7 +142,8 @@ export class OpenRouterProvider extends BaseProvider {
           response.usage.totalTokens ||
           usage.promptTokens + usage.completionTokens;
       }
-      return { raw, usage, streamed: false };
+
+      return { raw, reasoning, usage, streamed: false };
     }
   }
 }

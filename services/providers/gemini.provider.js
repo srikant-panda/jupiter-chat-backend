@@ -1,6 +1,10 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
 import { GoogleGenAI, Type } from "@google/genai";
+import {
+  createStreamReasoningFilter,
+  extractThinkReasoning,
+} from "../../utils/reasoningParser.js";
 
 /**
  * GeminiProvider integrates Google Gemini with multi-key pool support
@@ -32,6 +36,7 @@ export class GeminiProvider extends BaseProvider {
     messages,
     stream = false,
     onToken = null,
+    onReasoning = null,
     signal = null,
     responseFormat = null,
     tools = null,
@@ -129,16 +134,35 @@ export class GeminiProvider extends BaseProvider {
           config,
         });
 
-        let raw = "";
+        const filter = createStreamReasoningFilter({ onToken, onReasoning });
+
         for await (const chunk of responseStream) {
           if (signal?.aborted) {
             throw new Error("Request aborted by timeout or client.");
           }
-          const text = chunk.text || "";
-          if (text) {
-            raw += text;
-            if (onToken) await onToken(text);
+
+          const candidate = chunk.candidates?.[0];
+          let processedParts = false;
+
+          if (candidate?.content?.parts) {
+            for (const part of candidate.content.parts) {
+              if (part.thought) {
+                processedParts = true;
+                if (part.text) await filter.handleReasoning(part.text);
+              } else if (part.text) {
+                processedParts = true;
+                await filter.handleContent(part.text);
+              }
+            }
           }
+
+          if (!processedParts) {
+            const text = chunk.text || "";
+            if (text) {
+              await filter.handleContent(text);
+            }
+          }
+
           if (chunk.usageMetadata) {
             usage.promptTokens = chunk.usageMetadata.promptTokenCount || usage.promptTokens;
             usage.completionTokens =
@@ -148,7 +172,9 @@ export class GeminiProvider extends BaseProvider {
               usage.promptTokens + usage.completionTokens;
           }
         }
-        return { raw, usage, streamed: true };
+
+        const { raw, reasoning } = await filter.flush();
+        return { raw, reasoning, usage, streamed: true };
       } else {
         const response = await ai.models.generateContent({
           model: targetModel,
@@ -156,7 +182,30 @@ export class GeminiProvider extends BaseProvider {
           config,
         });
 
-        const raw = response.text || "";
+        const candidate = response.candidates?.[0];
+        let raw = "";
+        let reasoning = "";
+
+        if (candidate?.content?.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.thought) {
+              reasoning += part.text || "";
+            } else if (part.text) {
+              raw += part.text;
+            }
+          }
+        }
+
+        if (!raw && !reasoning) {
+          raw = response.text || "";
+        }
+
+        if (!reasoning && raw.includes("<think>")) {
+          const extracted = extractThinkReasoning(raw);
+          raw = extracted.content;
+          reasoning = extracted.reasoning;
+        }
+
         if (response.usageMetadata) {
           usage.promptTokens = response.usageMetadata.promptTokenCount || 0;
           usage.completionTokens = response.usageMetadata.candidatesTokenCount || 0;
@@ -164,7 +213,7 @@ export class GeminiProvider extends BaseProvider {
             response.usageMetadata.totalTokenCount ||
             usage.promptTokens + usage.completionTokens;
         }
-        return { raw, usage, streamed: false };
+        return { raw, reasoning, usage, streamed: false };
       }
     });
   }
