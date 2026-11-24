@@ -18,7 +18,7 @@ import {
 async function executeCustomProvider({ provider, model, messages, webSearch = false, onToken, onReasoning }) {
   const decode = createAnswerDecoder();
   const chunks = [];
-  let tokensEmitted = false;
+  let answerTokensEmitted = false;
   let reqFormat = responseFormat;
   const chatMessages = [responseInstruction, ...messages];
 
@@ -36,7 +36,7 @@ async function executeCustomProvider({ provider, model, messages, webSearch = fa
             chunks.push(delta);
             const text = decode(delta);
             if (text) {
-              tokensEmitted = true;
+              answerTokensEmitted = true;
               await onToken(text);
             }
           }
@@ -56,7 +56,7 @@ async function executeCustomProvider({ provider, model, messages, webSearch = fa
               chunks.push(delta);
               const text = decode(delta);
               if (text) {
-                tokensEmitted = true;
+                answerTokensEmitted = true;
                 await onToken(text);
               }
             }
@@ -70,7 +70,7 @@ async function executeCustomProvider({ provider, model, messages, webSearch = fa
   const raw = chunks.length > 0 ? chunks.join("") : response.raw || "";
   const parsed = parseRobustAnswer(raw);
 
-  if (onToken && !tokensEmitted && parsed.result) {
+  if (onToken && !answerTokensEmitted && parsed.result) {
     await onToken(parsed.result);
   }
 

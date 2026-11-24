@@ -127,7 +127,13 @@ async function respond(req, res, streaming) {
       messages: prepared,
       webSearch: Boolean(webSearch),
       onToken: streaming ? (text) => event(res, "token", { text }) : undefined,
-      onReasoning: streaming ? (text) => event(res, "reasoning", { text }) : undefined,
+      onReasoning: streaming
+        ? (text, opts) =>
+            event(res, "reasoning", {
+              text: text || "",
+              ...(opts?.reset ? { reset: true } : {}),
+            })
+        : undefined,
     });
     let assistantMessage;
     if (!temporary) {

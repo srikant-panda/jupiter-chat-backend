@@ -61,9 +61,6 @@ export class GroqProvider extends BaseProvider {
       }
 
       const activeTools = tools ? [...tools] : [];
-      if (webSearch && !activeTools.some((t) => t.type === "browser_search")) {
-        activeTools.push({ type: "browser_search" });
-      }
 
       const params = {
         model,
