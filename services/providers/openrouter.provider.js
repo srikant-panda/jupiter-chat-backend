@@ -10,6 +10,7 @@ export class OpenRouterProvider extends BaseProvider {
     keys = process.env.OPENROUTER_API_KEY || "",
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
     freeModel = process.env.OPENROUTER_FREE_MODEL || "openrouter/free",
+    models = process.env.OPENROUTER_MODELS || [],
     weight = 1,
   } = {}) {
     super({
@@ -19,15 +20,16 @@ export class OpenRouterProvider extends BaseProvider {
         keys,
         cooldownHours,
       }),
+      modelPool: models,
       defaultFreeModel: freeModel,
       weight,
     });
   }
 
   /**
-   * Overrides chat to use OpenRouter SDK with key pool rotation.
+   * Executes a single chat attempt with key pool retry. Called by BaseProvider.chat() model fallback loop.
    */
-  async chat({
+  async executeChat({
     model,
     messages,
     stream = false,
