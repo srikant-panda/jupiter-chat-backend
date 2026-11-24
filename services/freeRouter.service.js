@@ -111,7 +111,7 @@ export class FreeRouterService {
   /**
    * Generates answer using the free tier with timeout cancellation and auto-failover.
    */
-  async generateFreeAnswer({ messages, onToken = null, onReasoning = null, timeoutMs = null }) {
+  async generateFreeAnswer({ messages, webSearch = false, onToken = null, onReasoning = null, timeoutMs = null }) {
     const limitMs = timeoutMs || this.timeoutMs;
     const available = providerRegistry.getAvailableFreeProviders();
 
@@ -181,6 +181,7 @@ export class FreeRouterService {
               model,
               messages: chatMessages,
               stream: Boolean(onToken),
+              webSearch,
               signal: abortController.signal,
               responseFormat: reqFormat,
               onReasoning: wrappedOnReasoning,
@@ -205,6 +206,7 @@ export class FreeRouterService {
                 model,
                 messages: chatMessages,
                 stream: Boolean(onToken),
+                webSearch,
                 signal: abortController.signal,
                 onReasoning: wrappedOnReasoning,
                 onToken: onToken

@@ -3,6 +3,7 @@ export const messageRequest = z
   .object({
     content: z.string().trim().min(1).max(30000),
     model: z.string().trim().min(1).max(200).nullable().optional(),
+    webSearch: z.boolean().optional().default(false),
     temporary: z.boolean().optional().default(false),
     history: z
       .array(

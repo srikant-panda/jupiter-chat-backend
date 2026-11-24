@@ -15,7 +15,7 @@ import {
   extractThinkReasoning,
 } from "../utils/reasoningParser.js";
 
-async function executeCustomProvider({ provider, model, messages, onToken, onReasoning }) {
+async function executeCustomProvider({ provider, model, messages, webSearch = false, onToken, onReasoning }) {
   const decode = createAnswerDecoder();
   const chunks = [];
   let tokensEmitted = false;
@@ -28,6 +28,7 @@ async function executeCustomProvider({ provider, model, messages, onToken, onRea
       model,
       messages: chatMessages,
       stream: Boolean(onToken),
+      webSearch,
       responseFormat: reqFormat,
       onReasoning,
       onToken: onToken
@@ -48,6 +49,7 @@ async function executeCustomProvider({ provider, model, messages, onToken, onRea
         model,
         messages: chatMessages,
         stream: Boolean(onToken),
+        webSearch,
         onReasoning,
         onToken: onToken
           ? async (delta) => {
@@ -85,6 +87,7 @@ export async function generateAnswer({
   model,
   provider: providerHint,
   messages,
+  webSearch = false,
   onToken,
   onReasoning,
   client = openRouter,
@@ -93,7 +96,7 @@ export async function generateAnswer({
     model === "free" ||
     providerHint === "Auto (Multi-Provider)"
   ) {
-    return freeRouterService.generateFreeAnswer({ messages, onToken, onReasoning });
+    return freeRouterService.generateFreeAnswer({ messages, webSearch, onToken, onReasoning });
   }
 
   const { provider, model: targetModel } = providerRegistry.resolveProviderForModel(
@@ -113,6 +116,7 @@ export async function generateAnswer({
       provider,
       model: targetModel,
       messages,
+      webSearch,
       onToken,
       onReasoning,
     });
@@ -122,19 +126,23 @@ export async function generateAnswer({
     messages: [responseInstruction, ...messages],
     responseFormat,
     provider: { requireParameters: true },
-    tools: [
-      {
-        type: "openrouter:web_search",
-        parameters: {
-          engine: "auto",
-          max_results: 5,
-          max_total_results: 20,
-          search_context_size: "auto",
-          allowed_domains: [],
-          excluded_domains: [],
-        },
-      },
-    ],
+    ...(webSearch
+      ? {
+          tools: [
+            {
+              type: "openrouter:web_search",
+              parameters: {
+                engine: "auto",
+                max_results: 5,
+                max_total_results: 20,
+                search_context_size: "auto",
+                allowed_domains: [],
+                excluded_domains: [],
+              },
+            },
+          ],
+        }
+      : {}),
   };
   let emitted = "";
   const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };

@@ -29,6 +29,11 @@ const messageSchema = new mongoose.Schema({
     default: ""
   },
 
+  webSearch: {
+    type: Boolean,
+    default: false
+  },
+
   tokens: {
     type: Number,
     default: 0
