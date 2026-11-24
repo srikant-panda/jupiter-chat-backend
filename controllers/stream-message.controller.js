@@ -51,13 +51,18 @@ async function respond(req, res, streaming) {
       !model && !chat
         ? await AIModel.findOne({ isDefault: true, isActive: true })
         : null;
-    const modelId =
+    const rawModelId =
       model ||
       chat?.model ||
       defaultModel?.modelId ||
       process.env.DEFAULT_AI_MODEL ||
-      "openrouter/free";
-    if (!(await AIModel.exists({ modelId, isActive: true })))
+      "free";
+    const modelId = rawModelId === "openrouter/free" ? "free" : rawModelId;
+    const modelDoc =
+      modelId === "free"
+        ? null
+        : await AIModel.findOne({ modelId, isActive: true });
+    if (modelId !== "free" && !modelDoc)
       return res.status(400).json({
         message: "Select an available, active model.",
         invalidModel: true,
@@ -117,6 +122,7 @@ async function respond(req, res, streaming) {
     }
     const { result, title, usage } = await generateAnswer({
       model: modelId,
+      provider: modelDoc?.provider,
       messages: prepared,
       onToken: streaming ? (text) => event(res, "token", { text }) : undefined,
     });

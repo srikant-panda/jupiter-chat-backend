@@ -58,12 +58,23 @@ export const DEFAULT_AI_MODELS = [
     modelId: "openrouter/free",
     name: "Jupiter Free",
     provider: "OpenRouter",
-    desc: "Fast, intelligent, everyday reasoning",
+    desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
     badge: "Free",
     speed: "Ultra Fast",
     isActive: true,
     isDefault: true,
     order: 1,
+  },
+  {
+    modelId: "free",
+    name: "Jupiter Free",
+    provider: "Auto (Multi-Provider)",
+    desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
+    badge: "Free",
+    speed: "Ultra Fast",
+    isActive: true,
+    isDefault: false,
+    order: 2,
   },
   {
     modelId: "google/gemini-2.0-flash",
@@ -74,7 +85,7 @@ export const DEFAULT_AI_MODELS = [
     speed: "Instant",
     isActive: true,
     isDefault: false,
-    order: 2,
+    order: 3,
   },
   {
     modelId: "openai/gpt-4o-mini",
@@ -85,7 +96,7 @@ export const DEFAULT_AI_MODELS = [
     speed: "Very Fast",
     isActive: true,
     isDefault: false,
-    order: 3,
+    order: 4,
   },
   {
     modelId: "anthropic/claude-3-haiku",
@@ -96,7 +107,7 @@ export const DEFAULT_AI_MODELS = [
     speed: "Fast",
     isActive: true,
     isDefault: false,
-    order: 4,
+    order: 5,
   },
   {
     modelId: "meta-llama/llama-3.3-70b-instruct",
@@ -107,7 +118,7 @@ export const DEFAULT_AI_MODELS = [
     speed: "Balanced",
     isActive: true,
     isDefault: false,
-    order: 5,
+    order: 6,
   },
 ];
 
@@ -120,6 +131,30 @@ export async function ensureDefaultModelsSeeded() {
     if (count === 0) {
       await AIModel.insertMany(DEFAULT_AI_MODELS);
       console.log(`[AIModel] Seeded ${DEFAULT_AI_MODELS.length} default AI models into the database.`);
+    } else {
+      // Ensure "openrouter/free" is the primary default model entry
+      const openRouterFree = await AIModel.findOne({ modelId: "openrouter/free" });
+      if (openRouterFree) {
+        if (!openRouterFree.isDefault) {
+          openRouterFree.isDefault = true;
+          openRouterFree.name = "Jupiter Free";
+          await openRouterFree.save();
+        }
+      }
+      const freeExists = await AIModel.exists({ modelId: "free" });
+      if (!freeExists) {
+        await AIModel.create({
+          modelId: "free",
+          name: "Jupiter Free",
+          provider: "Auto (Multi-Provider)",
+          desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
+          badge: "Free",
+          speed: "Ultra Fast",
+          isActive: true,
+          isDefault: false,
+          order: 2,
+        });
+      }
     }
   } catch (err) {
     console.error("[AIModel] Error verifying default models seed:", err.message);

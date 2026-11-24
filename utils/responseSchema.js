@@ -50,22 +50,136 @@ export function parseAnswer(raw) {
   const parsed = output.parse(JSON.parse(cleaned));
   return { title: cleanTitle(parsed.title), result: parsed.answer };
 }
+
+/**
+ * Resilient parser that extracts title and answer from strict JSON, flexible JSON
+ * (e.g. response/message/content fields from varying AI providers), or raw markdown.
+ * Also intercepts provider error payloads (e.g. 503 high demand or unavailable).
+ */
+export function parseRobustAnswer(raw) {
+  try {
+    return parseAnswer(raw);
+  } catch (err) {
+    const cleaned = (raw || "")
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "");
+
+    try {
+      const obj = JSON.parse(cleaned);
+
+      // 1. Intercept array error payloads (e.g. Gemini 503: [{ error: { code: 503, message: ... } }])
+      if (Array.isArray(obj) && obj[0]?.error) {
+        const errObj = obj[0].error;
+        const e = new Error(errObj.message || "Provider returned an error");
+        e.status = errObj.code || 500;
+        throw e;
+      }
+
+      if (typeof obj === "object" && obj !== null) {
+        // 2. Intercept object error payloads
+        if (obj.error) {
+          const message =
+            typeof obj.error === "string"
+              ? obj.error
+              : obj.error.message || "Provider returned an error";
+          const e = new Error(message);
+          e.status = obj.error?.code || obj.error?.status || 500;
+          throw e;
+        }
+
+        // 3. Intercept HTTP error status payloads (e.g. { status: 503, message: ... } or { status: "UNAVAILABLE" })
+        if (
+          (typeof obj.status === "number" && obj.status >= 400) ||
+          obj.status === "UNAVAILABLE" ||
+          obj.status === "error"
+        ) {
+          const e = new Error(obj.message || `Provider returned status: ${obj.status}`);
+          e.status = typeof obj.status === "number" ? obj.status : 503;
+          throw e;
+        }
+
+        // 4. Extract content from standard text/answer/response/message fields
+        const text =
+          obj.answer ||
+          obj.response ||
+          obj.message ||
+          obj.content ||
+          obj.text ||
+          obj.result ||
+          "";
+        const contentStr =
+          typeof text === "string"
+            ? text
+            : text?.content || text?.text || "";
+
+        if (contentStr && contentStr.trim().length > 0) {
+          const rawTitle = obj.title || obj.topic || contentStr.slice(0, 40);
+          return {
+            title: cleanTitle(typeof rawTitle === "string" ? rawTitle : "Conversation"),
+            result: contentStr.trim(),
+          };
+        }
+      }
+    } catch (parseError) {
+      if (parseError.status || parseError.code) {
+        throw parseError;
+      }
+      // Not JSON or parse error, fall through to raw text check
+    }
+
+    // Only accept raw text if it is actual markdown content (e.g. starts with heading or substantial text)
+    // and not malformed JSON syntax (starting with { or [)
+    const isJsonAttempt = cleaned.startsWith("{") || cleaned.startsWith("[");
+    const isMarkdown = cleaned.startsWith("#") || (cleaned.length > 50 && !isJsonAttempt);
+
+    if (isMarkdown) {
+      const firstLine = cleaned.split("\n")[0] || "";
+      const headingMatch = firstLine.replace(/^[#\s]+/, "").trim();
+      const rawTitle = headingMatch.slice(0, 40) || cleaned.slice(0, 40);
+      return {
+        title: cleanTitle(rawTitle),
+        result: cleaned,
+      };
+    }
+    throw err;
+  }
+}
+
 // Decode only the answer's string value. Never send JSON syntax to the UI.
 // Incomplete escapes are retained until the next chunk, including Unicode pairs.
 export function createAnswerDecoder() {
   let buffer = "";
   let reading = false;
   let finished = false;
+  let rawMode = false;
   let highSurrogate = "";
   return (chunk) => {
     if (finished) return "";
     buffer += chunk;
     if (!reading) {
-      const match = /"answer"\s*:\s*"/.exec(buffer);
+      const trimmed = buffer.trimStart();
+      // If the response clearly does not start as a JSON object, switch to rawMode
+      if (trimmed.length > 0 && trimmed[0] !== "{" && trimmed[0] !== "[") {
+        reading = true;
+        rawMode = true;
+        const res = trimmed;
+        buffer = "";
+        return res;
+      }
+
+      const match = /"(?:answer|response|message|content|text)"\s*:\s*"/.exec(buffer);
       if (!match) return "";
       buffer = buffer.slice(match.index + match[0].length);
       reading = true;
     }
+
+    if (rawMode) {
+      const res = buffer;
+      buffer = "";
+      return res;
+    }
+
     let result = highSurrogate;
     highSurrogate = "";
     let i = 0;

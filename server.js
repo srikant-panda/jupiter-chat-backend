@@ -13,6 +13,7 @@ import adminRouter from "./routes/admin.routes.js";
 import shareRouter from "./routes/share.routes.js";
 import diagramRouter from "./routes/diagram.routes.js";
 import { ensureDefaultModelsSeeded } from "./models/aiModel.model.js";
+import { errorHandler } from "./middlewares/error.middleware.js";
 import cors from "cors";
 
 const app = express();
@@ -96,28 +97,7 @@ app.use("/api/admin/", adminRouter);
 app.use("/api/share/", shareRouter);
 app.use("/api/diagram/", diagramRouter);
 
-app.use((err, req, res, next) => {
-  console.error(err);
-
-  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid JSON",
-    });
-  }
-
-  if (err.message?.includes("not allowed by CORS")) {
-    return res.status(403).json({
-      success: false,
-      message: err.message,
-    });
-  }
-
-  return res.status(err.status || 500).json({
-    success: false,
-    message: err.message || "Internal server error",
-  });
-});
+app.use(errorHandler);
 
 if (
   !process.env.GOOGLE_CLIENT_ID ||

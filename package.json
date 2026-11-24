@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "node --test tests/*.test.js",
+    "test": "TEST_MODE=true NODE_ENV=test node --test --test-force-exit tests/*.test.js",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },

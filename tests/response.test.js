@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parseAnswer,
+  parseRobustAnswer,
+  createAnswerDecoder,
   partialAnswer,
   cleanTitle,
   unsupportedFormat,
@@ -254,4 +256,64 @@ test("web search is retained unless explicitly unsupported; nonstream fallback r
   });
   assert.equal(text, "Detailed answer");
   assert.equal(calls, 2);
+});
+
+test("parseRobustAnswer handles flexible AI provider responses and intercepts API errors", () => {
+  // 1. Flexible response with status and message (common variation)
+  const res1 = parseRobustAnswer(JSON.stringify({ status: "success", message: "Hello! How can I help you today?" }));
+  assert.equal(res1.result, "Hello! How can I help you today?");
+  assert.ok(res1.title.length > 0);
+
+  // 2. Flexible response with response field
+  const res2 = parseRobustAnswer(JSON.stringify({ response: "Here is your detailed answer." }));
+  assert.equal(res2.result, "Here is your detailed answer.");
+
+  // 3. Flexible response with content field
+  const res3 = parseRobustAnswer(JSON.stringify({ content: "Answer content from provider." }));
+  assert.equal(res3.result, "Answer content from provider.");
+
+  // 4. Intercept provider error object
+  assert.throws(
+    () => parseRobustAnswer(JSON.stringify({ error: { code: 503, message: "Spikes in demand" } })),
+    (err) => err.status === 503 && err.message.includes("Spikes in demand")
+  );
+
+  // 5. Intercept provider array error (e.g. Gemini OpenAI-compat 503 format)
+  assert.throws(
+    () => parseRobustAnswer(JSON.stringify([{ error: { code: 503, message: "This model is currently experiencing high demand.", status: "UNAVAILABLE" } }])),
+    (err) => err.status === 503 && err.message.includes("high demand")
+  );
+
+  // 6. Intercept provider UNAVAILABLE status object
+  assert.throws(
+    () => parseRobustAnswer(JSON.stringify({ status: "UNAVAILABLE", message: "Model currently unavailable" })),
+    (err) => err.status === 503 && err.message.includes("Model currently unavailable")
+  );
+
+  // 7. Plain markdown text fallback
+  const resRaw = parseRobustAnswer("## Overview\nThis is raw markdown returned without JSON formatting.");
+  assert.equal(resRaw.result, "## Overview\nThis is raw markdown returned without JSON formatting.");
+  assert.equal(resRaw.title, "Overview");
+});
+
+test("createAnswerDecoder streams flexible response keys and raw text directly", () => {
+  // Decode response with "message" key
+  const decodeMessage = createAnswerDecoder();
+  const chunk1 = '{"status":"ok","message":"Hello ';
+  const chunk2 = 'world!"}';
+  const out1 = decodeMessage(chunk1);
+  const out2 = decodeMessage(chunk2);
+  assert.equal(out1 + out2, "Hello world!");
+
+  // Decode response with "response" key
+  const decodeResponse = createAnswerDecoder();
+  const outR1 = decodeResponse('{"response":"Direct ');
+  const outR2 = decodeResponse('reply"}');
+  assert.equal(outR1 + outR2, "Direct reply");
+
+  // Stream raw non-JSON text directly without waiting for JSON schema keys
+  const decodeRaw = createAnswerDecoder();
+  const outRaw1 = decodeRaw("## Section\n");
+  const outRaw2 = decodeRaw("Streaming content");
+  assert.equal(outRaw1 + outRaw2, "## Section\nStreaming content");
 });

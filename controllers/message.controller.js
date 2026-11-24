@@ -1,36 +1,26 @@
 import Message from "../models/message.model.js";
 import Chat from "../models/chat.model.js";
 import mongoose from "mongoose";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { AppError } from "../utils/appError.js";
 
-export const getMessage = async (req, res) => {
-  try {
-    const chatId = req.params?.chatId;
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      return res.status(400).json({
-        message: "ChatId is not a valid id.",
-        success: false,
-      });
-    }
-    const userId = req.tokenData?.id;
-
-    const chat = await Chat.findOne({ _id: chatId, userId });
-    if (!chat)
-      return res
-        .status(404)
-        .json({ message: "Chat not found.", success: false });
-
-    const messages = await Message.find({ chatId }).sort({ createdAt: 1 });
-    // console.log(messages);
-    res.json({
-      message: "Messages fetched.",
-      data: messages,
-    });
-  } catch (err) {
-    console.log(err);
-    return res.status(500).json({
-      message: "Internal server error.",
-    });
+export const getMessage = asyncHandler(async (req, res) => {
+  const chatId = req.params?.chatId;
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    throw new AppError("ChatId is not a valid id.", 400);
   }
-};
+  const userId = req.tokenData?.id;
+
+  const chat = await Chat.findOne({ _id: chatId, userId });
+  if (!chat) {
+    throw new AppError("Chat not found.", 404);
+  }
+
+  const messages = await Message.find({ chatId }).sort({ createdAt: 1 });
+  res.json({
+    message: "Messages fetched.",
+    data: messages,
+  });
+});
 
 export { sendMessage } from "./stream-message.controller.js";

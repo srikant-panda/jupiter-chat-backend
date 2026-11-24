@@ -3,146 +3,115 @@ import Message from "../models/message.model.js";
 import SharedChat from "../models/sharedChat.model.js";
 import AIModel, { ensureDefaultModelsSeeded } from "../models/aiModel.model.js";
 import mongoose from "mongoose";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { AppError } from "../utils/appError.js";
 
-export const getRecentChat = async (req, res) => {
-  try {
-    const chatData = await Chat.find({ userId: req.tokenData.id })
-      .select("topic model updatedAt")
-      .sort({ updatedAt: -1 })
-      .limit(20);
+export const getRecentChat = asyncHandler(async (req, res) => {
+  const chatData = await Chat.find({ userId: req.tokenData.id })
+    .select("topic model updatedAt")
+    .sort({ updatedAt: -1 })
+    .limit(20);
 
-    return res.json({
-      message: "Chats fetched successfully.",
-      chats: chatData,
-      success: true,
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Internal server error." });
+  return res.json({
+    message: "Chats fetched successfully.",
+    chats: chatData,
+    success: true,
+  });
+});
+
+export const createChat = asyncHandler(async (req, res) => {
+  const { model, topic = null } = req.body;
+  if (!model) {
+    throw new AppError("Model name is missing.", 400);
   }
-};
 
-export const createChat = async (req, res) => {
-  try {
-    const { model, topic = null } = req.body;
-    if (!model) {
-      return res
-        .status(400)
-        .json({ message: "Model name is missing.", success: false });
-    }
+  const requestedModel = model.trim();
+  const normalizedModelId =
+    requestedModel === "openrouter/free" ? "free" : requestedModel;
 
-    // Validate that the model exists and is active in the database
-    let validModel = await AIModel.findOne({
-      modelId: model.trim(),
+  // Validate that the model exists and is active in the database
+  let validModel = await AIModel.findOne({
+    modelId: normalizedModelId,
+    isActive: true,
+  });
+
+  if (!validModel) {
+    await ensureDefaultModelsSeeded();
+    validModel = await AIModel.findOne({
+      modelId: normalizedModelId,
       isActive: true,
     });
-    if (!validModel) {
-      // If collection is not seeded yet, seed and check again
-      await ensureDefaultModelsSeeded();
-      validModel = await AIModel.findOne({
-        modelId: model.trim(),
-        isActive: true,
-      });
-    }
+  }
 
-    if (!validModel) {
-      return res.status(400).json({
-        message: `Invalid model: "${model}". Please select a valid active model from available models.`,
-        success: false,
-        invalidModel: true,
-      });
-    }
+  // Allow "free" as a builtin valid model
+  if (!validModel && normalizedModelId === "free") {
+    validModel = { modelId: "free" };
+  }
 
-    const createdChat = await Chat.create({
-      userId: req.tokenData.id,
-      topic,
-      model: validModel.modelId,
-    });
-    res.status(201).json({
-      message: "Chat created successfully.",
-      chatData: {
-        chatId: createdChat._id,
-        userId: req.tokenData.id,
-        model: createdChat.model,
-        topic: createdChat.topic,
-      },
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({
-      message: "Internal server error.",
+  if (!validModel) {
+    return res.status(400).json({
+      message: `Invalid model: "${model}". Please select a valid active model from available models.`,
+      success: false,
+      invalidModel: true,
     });
   }
-};
 
-export const deleteChatByID = async (req, res) => {
-  try {
-    const chatId = req.params?.chatId;
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      return res.status(400).json({
-        message: "ChatId is not a valid id.",
-        success: false,
-      });
-    }
-    const userId = req.tokenData.id;
-    const chat = await Chat.findOne({ _id: chatId, userId: userId });
-    if (!chat) {
-      return res.status(404).json({
-        message: "Chat not found.",
-        success: false,
-      });
-    }
-    await SharedChat.deleteMany({ chatId, userId });
-    const deleteMessage = await Message.deleteMany({
-      chatId: chatId,
+  const createdChat = await Chat.create({
+    userId: req.tokenData.id,
+    topic,
+    model: validModel.modelId,
+  });
+
+  res.status(201).json({
+    message: "Chat created successfully.",
+    chatData: {
+      chatId: createdChat._id,
       userId: req.tokenData.id,
-    });
-    const deletedChat = await Chat.findOneAndDelete({
-      _id: chatId,
-      userId: req.tokenData.id,
-    });
+      model: createdChat.model,
+      topic: createdChat.topic,
+    },
+  });
+});
 
-    if (!deletedChat) {
-      return res.status(403).json({
-        message: "You are not the owner of this chat",
-        success: false,
-      });
-    }
-
-    return res.status(200).json({
-      message: "Chat deleted successfully",
-      success: true,
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Internal server error." });
+export const deleteChatByID = asyncHandler(async (req, res) => {
+  const chatId = req.params?.chatId;
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    throw new AppError("ChatId is not a valid id.", 400);
   }
-};
 
-export const getChatById = async (req, res) => {
-  try {
-    const chatId = req.params?.chatId;
-    // console.log(chatId);
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      return res.status(400).json({
-        message: "ChatId is not a valid id.",
-        success: false,
-      });
-    }
-    const chat = await Chat.findOne({ _id: chatId, userId: req.tokenData.id });
-
-    if (!chat) {
-      return res.status(404).json({
-        message: "Chat not found.",
-        success: false,
-      });
-    }
-    res.json({
-      message: "Chat fetched successfully.",
-      chat,
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Internal server error." });
+  const userId = req.tokenData.id;
+  const chat = await Chat.findOne({ _id: chatId, userId });
+  if (!chat) {
+    throw new AppError("Chat not found.", 404);
   }
-};
+
+  await SharedChat.deleteMany({ chatId, userId });
+  await Message.deleteMany({ chatId, userId });
+  const deletedChat = await Chat.findOneAndDelete({ _id: chatId, userId });
+
+  if (!deletedChat) {
+    throw new AppError("You are not the owner of this chat", 403);
+  }
+
+  return res.status(200).json({
+    message: "Chat deleted successfully",
+    success: true,
+  });
+});
+
+export const getChatById = asyncHandler(async (req, res) => {
+  const chatId = req.params?.chatId;
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    throw new AppError("ChatId is not a valid id.", 400);
+  }
+
+  const chat = await Chat.findOne({ _id: chatId, userId: req.tokenData.id });
+  if (!chat) {
+    throw new AppError("Chat not found.", 404);
+  }
+
+  res.json({
+    message: "Chat fetched successfully.",
+    chat,
+  });
+});

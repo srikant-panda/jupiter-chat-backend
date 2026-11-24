@@ -46,10 +46,14 @@ export const updateSummaryIfNeeded = async (chatId) => {
   ];
 
 
-  const { result,usage } = await generateAIResponse({
-    model:chat.model,
-    messages:summarymessage
-  })
+  const chatModelDoc = await (await import("../models/aiModel.model.js")).default.findOne({
+    modelId: chat.model,
+  });
+  const { result, usage } = await generateAIResponse({
+    model: chat.model,
+    provider: chatModelDoc?.provider,
+    messages: summarymessage,
+  });
 
   chat.summary = result;
   chat.summarizedTillMessageNumber += messagesToSummarize.length;
