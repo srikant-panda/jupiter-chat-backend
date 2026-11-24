@@ -55,23 +55,23 @@ aiModelSchema.index({ isActive: 1, order: 1 });
 
 export const DEFAULT_AI_MODELS = [
   {
-    modelId: "openrouter/free",
-    name: "Jupiter Free",
-    provider: "OpenRouter",
-    desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
-    badge: "Free",
+    modelId: "free",
+    name: "Jupiter Auto",
+    provider: "Auto (Multi-Provider)",
+    desc: "Dynamic multi-provider failover (Groq → OpenRouter → Gemini)",
+    badge: "Auto",
     speed: "Ultra Fast",
     isActive: true,
     isDefault: true,
     order: 1,
   },
   {
-    modelId: "free",
-    name: "Jupiter Free",
-    provider: "Auto (Multi-Provider)",
-    desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
+    modelId: "openrouter/free",
+    name: "Jupiter Free (OpenRouter)",
+    provider: "OpenRouter",
+    desc: "OpenRouter free tier with multi-key rotation",
     badge: "Free",
-    speed: "Ultra Fast",
+    speed: "Fast",
     isActive: true,
     isDefault: false,
     order: 2,
@@ -132,28 +132,40 @@ export async function ensureDefaultModelsSeeded() {
       await AIModel.insertMany(DEFAULT_AI_MODELS);
       console.log(`[AIModel] Seeded ${DEFAULT_AI_MODELS.length} default AI models into the database.`);
     } else {
-      // Ensure "openrouter/free" is the primary default model entry
-      const openRouterFree = await AIModel.findOne({ modelId: "openrouter/free" });
-      if (openRouterFree) {
-        if (!openRouterFree.isDefault) {
-          openRouterFree.isDefault = true;
-          openRouterFree.name = "Jupiter Free";
-          await openRouterFree.save();
+      // Ensure "free" is the primary default model entry
+      const freeModel = await AIModel.findOne({ modelId: "free" });
+      if (freeModel) {
+        if (!freeModel.isDefault || freeModel.name !== "Jupiter Auto") {
+          freeModel.isDefault = true;
+          freeModel.name = "Jupiter Auto";
+          freeModel.provider = "Auto (Multi-Provider)";
+          await freeModel.save();
         }
-      }
-      const freeExists = await AIModel.exists({ modelId: "free" });
-      if (!freeExists) {
+      } else {
         await AIModel.create({
           modelId: "free",
-          name: "Jupiter Free",
+          name: "Jupiter Auto",
           provider: "Auto (Multi-Provider)",
-          desc: "Fast, intelligent, everyday reasoning with dynamic auto-failover",
-          badge: "Free",
+          desc: "Dynamic multi-provider failover (Groq → OpenRouter → Gemini)",
+          badge: "Auto",
           speed: "Ultra Fast",
           isActive: true,
-          isDefault: false,
-          order: 2,
+          isDefault: true,
+          order: 1,
         });
+      }
+      const openRouterFree = await AIModel.findOne({ modelId: "openrouter/free" });
+      if (openRouterFree) {
+        let changed = false;
+        if (openRouterFree.isDefault) {
+          openRouterFree.isDefault = false;
+          changed = true;
+        }
+        if (openRouterFree.name === "Jupiter Free") {
+          openRouterFree.name = "Jupiter Free (OpenRouter)";
+          changed = true;
+        }
+        if (changed) await openRouterFree.save();
       }
     }
   } catch (err) {

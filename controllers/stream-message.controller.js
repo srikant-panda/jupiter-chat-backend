@@ -51,13 +51,12 @@ async function respond(req, res, streaming) {
       !model && !chat
         ? await AIModel.findOne({ isDefault: true, isActive: true })
         : null;
-    const rawModelId =
+    const modelId =
       model ||
       chat?.model ||
       defaultModel?.modelId ||
       process.env.DEFAULT_AI_MODEL ||
       "free";
-    const modelId = rawModelId === "openrouter/free" ? "free" : rawModelId;
     const modelDoc =
       modelId === "free"
         ? null

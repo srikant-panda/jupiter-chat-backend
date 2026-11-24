@@ -91,7 +91,6 @@ export async function generateAnswer({
 }) {
   if (
     model === "free" ||
-    model === "openrouter/free" ||
     providerHint === "Auto (Multi-Provider)"
   ) {
     return freeRouterService.generateFreeAnswer({ messages, onToken, onReasoning });
