@@ -87,7 +87,7 @@ export async function generateAnswer({
   model,
   provider: providerHint,
   messages,
-  webSearch = false,
+  webSearch = true,
   onToken,
   onReasoning,
   client = openRouter,
