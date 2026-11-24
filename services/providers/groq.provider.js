@@ -12,7 +12,7 @@ export class GroqProvider extends BaseProvider {
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
     freeModel = process.env.GROQ_FREE_MODEL || "llama-3.3-70b-versatile",
     models = process.env.GROQ_MODELS || [],
-    weight = 2,
+    weight = 3,
   } = {}) {
     super({
       name: "groq",

@@ -11,7 +11,7 @@ export class OpenRouterProvider extends BaseProvider {
     cooldownHours = process.env.API_KEY_COOLDOWN_HOURS || 4,
     freeModel = process.env.OPENROUTER_FREE_MODEL || "openrouter/free",
     models = process.env.OPENROUTER_MODELS || [],
-    weight = 1,
+    weight = 2,
   } = {}) {
     super({
       name: "openrouter",

@@ -7,8 +7,8 @@ import { GeminiProvider } from "./gemini.provider.js";
  */
 class ProviderRegistry {
   constructor() {
-    this.openrouter = new OpenRouterProvider();
     this.groq = new GroqProvider();
+    this.openrouter = new OpenRouterProvider();
     this.gemini = new GeminiProvider();
   }
 
@@ -16,21 +16,21 @@ class ProviderRegistry {
    * Reload / reinitialize key pools if environment changes (useful in testing).
    */
   reload() {
-    this.openrouter = new OpenRouterProvider();
     this.groq = new GroqProvider();
+    this.openrouter = new OpenRouterProvider();
     this.gemini = new GeminiProvider();
   }
 
   /**
    * Returns all providers currently eligible to serve free tier requests:
+   * Ordered Groq first, then OpenRouter, then Gemini.
    * Must be configured, have an active free model, and have at least one key not blacklisted.
    */
   getAvailableFreeProviders() {
     const list = [];
     if (this.groq.hasFreeModel()) list.push(this.groq);
-    if (this.gemini.hasFreeModel()) list.push(this.gemini);
-    // OpenRouter always included if configured & has keys
     if (this.openrouter.hasFreeModel()) list.push(this.openrouter);
+    if (this.gemini.hasFreeModel()) list.push(this.gemini);
     return list;
   }
 
