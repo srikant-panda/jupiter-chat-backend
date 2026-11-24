@@ -247,3 +247,102 @@ test("FreeRouter: orders candidate providers Groq first, then OpenRouter, then G
     (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = origAvailable;
   }
 });
+
+test("FreeRouter: prioritizes search-capable providers (OpenRouter, Gemini) when webSearch is enabled", async () => {
+  const router = new FreeRouterService({ timeoutMs: 50 });
+
+  const geminiProv = new BaseProvider({
+    name: "gemini",
+    keyPool: new KeyPool({ providerName: "gemini", keys: ["k1"] }),
+    defaultFreeModel: "gemini-2.0-flash",
+  });
+  const openrouterProv = new BaseProvider({
+    name: "openrouter",
+    keyPool: new KeyPool({ providerName: "openrouter", keys: ["k2"] }),
+    defaultFreeModel: "openrouter/free",
+  });
+  const groqProv = new BaseProvider({
+    name: "groq",
+    keyPool: new KeyPool({ providerName: "groq", keys: ["k3"] }),
+    defaultFreeModel: "llama-3.3-70b-versatile",
+  });
+
+  // Verify when webSearch is true, OpenRouter and Gemini are prioritized
+  const orderedSearch = router.orderCandidateProviders(
+    [geminiProv, openrouterProv, groqProv],
+    true
+  );
+  assert.deepEqual(orderedSearch.map((p) => p.name), ["openrouter", "gemini", "groq"]);
+
+  // Verify when webSearch is false, Groq is first
+  const orderedStandard = router.orderCandidateProviders(
+    [geminiProv, openrouterProv, groqProv],
+    false
+  );
+  assert.deepEqual(orderedStandard.map((p) => p.name), ["groq", "openrouter", "gemini"]);
+});
+
+test("FreeRouter: seamlessly fails over when a provider fails after emitting reasoning before any answer tokens", async () => {
+  const router = new FreeRouterService({ timeoutMs: 50 });
+
+  const groqProv = new BaseProvider({
+    name: "groq",
+    keyPool: new KeyPool({ providerName: "groq", keys: ["k1"] }),
+    defaultFreeModel: "llama-3.3-70b-versatile",
+  });
+  const openrouterProv = new BaseProvider({
+    name: "openrouter",
+    keyPool: new KeyPool({ providerName: "openrouter", keys: ["k2"] }),
+    defaultFreeModel: "openrouter/free",
+  });
+
+  const reasoningCalls = [];
+  groqProv.chat = async ({ onReasoning }) => {
+    if (onReasoning) {
+      await onReasoning("Thinking about this question...");
+    }
+    // Simulate provider failure during reasoning (e.g. tool call validation error)
+    const err = new Error("Tool call validation failed: attempted to call tool 'json'");
+    err.status = 400;
+    throw err;
+  };
+
+  openrouterProv.chat = async ({ onToken }) => {
+    if (onToken) {
+      await onToken('{"title":"Seamless Answer","answer":"Answer from OpenRouter after Groq reasoning failover"}');
+    }
+    return {
+      raw: JSON.stringify({
+        title: "Seamless Answer",
+        answer: "Answer from OpenRouter after Groq reasoning failover",
+      }),
+      usage: { totalTokens: 25 },
+    };
+  };
+
+  const origAvailable = (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders;
+  (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = () => [
+    groqProv,
+    openrouterProv,
+  ];
+
+  try {
+    const tokensReceived = [];
+    const result = await router.generateFreeAnswer({
+      messages: [{ role: "user", content: "test reasoning failover" }],
+      onReasoning: (chunk, opts) => {
+        reasoningCalls.push({ chunk, opts });
+      },
+      onToken: (t) => {
+        tokensReceived.push(t);
+      },
+    });
+
+    assert.equal(result.provider, "openrouter");
+    assert.equal(result.result, "Answer from OpenRouter after Groq reasoning failover");
+    // Verify reasoning reset was sent when Groq failed
+    assert.ok(reasoningCalls.some((c) => c.opts?.reset === true));
+  } finally {
+    (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = origAvailable;
+  }
+});
