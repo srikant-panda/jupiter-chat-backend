@@ -134,17 +134,16 @@ export class BaseProvider {
     }
 
     let lastError = null;
-    let tokensEmitted = false;
+    let answerTokensEmitted = false;
     const wrappedOnToken = onToken
       ? async (chunk) => {
-          tokensEmitted = true;
+          answerTokensEmitted = true;
           await onToken(chunk);
         }
       : null;
     const wrappedOnReasoning = onReasoning
-      ? async (chunk) => {
-          tokensEmitted = true;
-          await onReasoning(chunk);
+      ? async (chunk, opts) => {
+          await onReasoning(chunk, opts);
         }
       : null;
 
@@ -175,8 +174,8 @@ export class BaseProvider {
       } catch (err) {
         lastError = err;
 
-        // If tokens have already been streamed to client, cannot switch model mid-flight
-        if (tokensEmitted) {
+        // If answer tokens have already been streamed to client, cannot switch model mid-flight
+        if (answerTokensEmitted) {
           throw err;
         }
 

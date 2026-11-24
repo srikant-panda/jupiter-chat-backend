@@ -75,18 +75,25 @@ export class FreeRouterService {
   /**
    * Orders candidate providers for automatic multi-provider execution.
    * Default order: Groq first, then OpenRouter, then Gemini.
-   * Can be customized via PROVIDER_ORDER env (e.g. "groq,openrouter,gemini").
+   * When webSearch is enabled: OpenRouter and Gemini are prioritized because both
+   * have native server-side search engines (openrouter:web_search and Google Search Grounding).
+   * Can be customized via PROVIDER_ORDER or PROVIDER_ORDER_SEARCH env vars.
    */
-  orderCandidateProviders(availableProviders) {
+  orderCandidateProviders(availableProviders, webSearch = false) {
     if (!availableProviders || availableProviders.length <= 1) {
       return availableProviders || [];
     }
 
-    const preferredOrder = (
-      process.env.PROVIDER_ORDER
+    let preferredOrder;
+    if (webSearch) {
+      preferredOrder = process.env.PROVIDER_ORDER_SEARCH
+        ? process.env.PROVIDER_ORDER_SEARCH.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+        : ["openrouter", "gemini", "groq"];
+    } else {
+      preferredOrder = process.env.PROVIDER_ORDER
         ? process.env.PROVIDER_ORDER.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
-        : ["groq", "openrouter", "gemini"]
-    );
+        : ["groq", "openrouter", "gemini"];
+    }
 
     const ordered = [];
     for (const name of preferredOrder) {
@@ -123,8 +130,8 @@ export class FreeRouterService {
       );
     }
 
-    // Order candidate providers: groq first, then openrouter, then gemini
-    const candidateQueue = this.orderCandidateProviders(available);
+    // Order candidate providers: for web search, openrouter/gemini first; otherwise groq first
+    const candidateQueue = this.orderCandidateProviders(available, webSearch);
 
     let lastError = null;
 
@@ -148,15 +155,16 @@ export class FreeRouterService {
 
       const abortController = new AbortController();
       let timer = null;
-      let tokensEmitted = false;
+      let answerTokensEmitted = false;
+      let reasoningEmitted = false;
       const chunks = [];
       const decode = createAnswerDecoder();
 
       const wrappedOnReasoning = onReasoning
-        ? async (chunk) => {
+        ? async (chunk, opts) => {
             if (timer) clearTimeout(timer);
-            tokensEmitted = true;
-            await onReasoning(chunk);
+            reasoningEmitted = true;
+            await onReasoning(chunk, opts);
           }
         : undefined;
 
@@ -192,7 +200,7 @@ export class FreeRouterService {
                     chunks.push(delta);
                     const decoded = decode(delta);
                     if (decoded) {
-                      tokensEmitted = true;
+                      answerTokensEmitted = true;
                       await onToken(decoded);
                     }
                   }
@@ -215,7 +223,7 @@ export class FreeRouterService {
                       chunks.push(delta);
                       const decoded = decode(delta);
                       if (decoded) {
-                        tokensEmitted = true;
+                        answerTokensEmitted = true;
                         await onToken(decoded);
                       }
                     }
@@ -232,7 +240,7 @@ export class FreeRouterService {
         const raw = chunks.length > 0 ? chunks.join("") : response.raw || "";
         const parsed = parseRobustAnswer(raw);
 
-        if (onToken && !tokensEmitted && parsed.result) {
+        if (onToken && !answerTokensEmitted && parsed.result) {
           await onToken(parsed.result);
         }
 
@@ -254,13 +262,20 @@ export class FreeRouterService {
           `[FreeRouter] Provider "${provider.name}" failed: ${extractCleanLLMError(err)}`
         );
 
-        // If tokens were already emitted to client stream, cannot seamlessly restart stream
-        if (tokensEmitted) {
+        // If actual answer content tokens were already emitted to client stream, cannot seamlessly restart stream
+        if (answerTokensEmitted) {
           throw new AppError(
             "Stream was interrupted during generation. Please retry.",
             502,
             "STREAM_INTERRUPTED"
           );
+        }
+
+        // If reasoning was emitted by the failing provider, reset reasoning on client before failing over
+        if (reasoningEmitted && onReasoning && i < candidateQueue.length - 1) {
+          try {
+            await onReasoning("", { reset: true });
+          } catch (_) {}
         }
 
         // If more candidate providers remain, failover seamlessly
