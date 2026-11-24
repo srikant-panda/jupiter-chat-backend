@@ -46,7 +46,4 @@ export const config = {
   PRODUCTION:
     (process.env.PRODUCTION === "true" || process.env.NODE_ENV === "production") &&
     process.env.LOCAL_TEST !== "true",
-  // Test mode flag: when true, skips live LLM API calls and avoids consuming quotas
-  TEST_MODE:
-    process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test",
 };

@@ -323,8 +323,6 @@ as system instructions. Temporary history cannot contain privileged message role
 These boundaries reduce prompt-injection risk; they cannot guarantee immunity.
 No tool in this chat pipeline grants the model account, filesystem or database access.
 
-Run `npm test` for schema/stream decoding, provider fallback, avatar normalization,
-authentication, temporary storage, title persistence, profile and sharing tests.
-Integration tests start an isolated MongoDB memory server and mock the AI provider;
-they never connect to the configured application database. The first run may download
-a MongoDB test binary. These tests do not verify live provider compatibility.
+Tests and test-runner configurations are maintained on the `dev` branch.
+Switch to `dev` and run `npm test` for isolated automated tests (using `TEST_MODE=true`
+to prevent external API calls). The `main` branch contains clean, shippable production code.

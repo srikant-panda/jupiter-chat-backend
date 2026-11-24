@@ -34,23 +34,6 @@ export class GeminiProvider extends BaseProvider {
     responseFormat = null,
     tools = null,
   }) {
-    if (process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test") {
-      const mockTitle = "Test Response";
-      const mockAnswer =
-        "## Overview\nThis is a mock answer generated for tests without calling external AI APIs.";
-      const raw = JSON.stringify({ title: mockTitle, answer: mockAnswer });
-      if (onToken) {
-        await onToken(mockAnswer);
-      }
-      return {
-        title: mockTitle,
-        result: mockAnswer,
-        raw,
-        usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
-        provider: this.name,
-        model,
-      };
-    }
     return this.keyPool.executeWithRetry(async (key) => {
       // Intercept Google error responses returning arrays [{ error: ... }] so OpenAI SDK formats them cleanly
       const customFetch = async (url, init) => {

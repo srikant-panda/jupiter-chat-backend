@@ -81,62 +81,33 @@ export async function generateAnswer({
   onToken,
   client = openRouter,
 }) {
-  const isTestMode =
-    process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test";
-
-  // If the request is for the dynamic free model and client is not a custom mock in test
-  const isMockedClient =
-    client !== openRouter ||
-    (openRouter &&
-      typeof openRouter.chat?.send === "function" &&
-      openRouter.chat.send !== Object.getPrototypeOf(openRouter).chat?.send);
-
-  if (!isMockedClient) {
-    if (
-      model === "free" ||
-      model === "openrouter/free" ||
-      providerHint === "Auto (Multi-Provider)"
-    ) {
-      return freeRouterService.generateFreeAnswer({ messages, onToken });
-    }
-
-    const { provider, model: targetModel } = providerRegistry.resolveProviderForModel(
-      model,
-      providerHint
-    );
-
-    if (provider && provider.name !== "openrouter") {
-      if (!provider.isConfigured()) {
-        throw new AppError(
-          `Provider "${provider.name}" is not configured. Please add ${provider.name.toUpperCase()}_API_KEY in your .env file.`,
-          400,
-          "PROVIDER_NOT_CONFIGURED"
-        );
-      }
-      return executeCustomProvider({
-        provider,
-        model: targetModel,
-        messages,
-        onToken,
-      });
-    }
+  if (
+    model === "free" ||
+    model === "openrouter/free" ||
+    providerHint === "Auto (Multi-Provider)"
+  ) {
+    return freeRouterService.generateFreeAnswer({ messages, onToken });
   }
 
-  // If in test mode and no custom mock client was supplied, return mocked answer without calling external API
-  if (isTestMode && !isMockedClient) {
-    const mockTitle = "Test Response";
-    const mockAnswer =
-      "## Overview\nThis is a mock answer generated for tests without calling external AI APIs.";
-    if (onToken) {
-      await onToken(mockAnswer);
+  const { provider, model: targetModel } = providerRegistry.resolveProviderForModel(
+    model,
+    providerHint
+  );
+
+  if (provider && provider.name !== "openrouter") {
+    if (!provider.isConfigured()) {
+      throw new AppError(
+        `Provider "${provider.name}" is not configured. Please add ${provider.name.toUpperCase()}_API_KEY in your .env file.`,
+        400,
+        "PROVIDER_NOT_CONFIGURED"
+      );
     }
-    return {
-      title: mockTitle,
-      result: mockAnswer,
-      usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
-      provider: providerHint || "openrouter",
-      model,
-    };
+    return executeCustomProvider({
+      provider,
+      model: targetModel,
+      messages,
+      onToken,
+    });
   }
   const chatRequest = {
     model,

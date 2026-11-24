@@ -13,9 +13,6 @@ export class BaseProvider {
    * Whether this provider has at least one API key configured in env.
    */
   isConfigured() {
-    if (process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test") {
-      return true;
-    }
     return Boolean(this.keyPool && this.keyPool.totalKeys > 0);
   }
 
@@ -23,9 +20,6 @@ export class BaseProvider {
    * Whether this provider has at least one API key not in rate-limit cooldown.
    */
   isAvailable() {
-    if (process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test") {
-      return true;
-    }
     return Boolean(this.isConfigured() && this.keyPool.hasAvailableKey());
   }
 

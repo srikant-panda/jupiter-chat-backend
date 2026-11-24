@@ -1,7 +1,6 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
 import { OpenRouter } from "@openrouter/sdk";
-import openRouterSingleton from "../../config/openrouter.js";
 
 /**
  * OpenRouterProvider wraps OpenRouter API calls with multi-key pool support.
@@ -37,46 +36,6 @@ export class OpenRouterProvider extends BaseProvider {
     responseFormat = null,
     tools = null,
   }) {
-    if (process.env.TEST_MODE === "true" || process.env.NODE_ENV === "test") {
-      const isMocked =
-        openRouterSingleton &&
-        typeof openRouterSingleton.chat?.send === "function" &&
-        openRouterSingleton.chat.send !== OpenRouter.prototype.chat?.send;
-      if (!isMocked) {
-        const mockTitle = "Test Response";
-        const mockAnswer =
-          "## Overview\nThis is a mock answer generated for tests without calling external AI APIs.";
-        const raw = JSON.stringify({ title: mockTitle, answer: mockAnswer });
-        if (onToken) {
-          await onToken(mockAnswer);
-        }
-        return {
-          title: mockTitle,
-          result: mockAnswer,
-          raw,
-          usage: { promptTokens: 5, completionTokens: 10, totalTokens: 15 },
-          provider: this.name,
-          model,
-        };
-      }
-    }
-    // If testing has mocked openRouterSingleton.chat.send, respect that mock
-    if (
-      openRouterSingleton &&
-      typeof openRouterSingleton.chat?.send === "function" &&
-      openRouterSingleton.chat.send !== OpenRouter.prototype.chat?.send
-    ) {
-      return this._executeWithClient(openRouterSingleton, {
-        model,
-        messages,
-        stream,
-        onToken,
-        signal,
-        responseFormat,
-        tools,
-      });
-    }
-
     return this.keyPool.executeWithRetry(async (key) => {
       const client = new OpenRouter({ apiKey: key });
       return this._executeWithClient(client, {
