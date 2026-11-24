@@ -116,6 +116,7 @@ export class BaseProvider {
     messages,
     stream = false,
     onToken = null,
+    onReasoning = null,
     signal = null,
     responseFormat = null,
     tools = null,
@@ -138,6 +139,12 @@ export class BaseProvider {
           await onToken(chunk);
         }
       : null;
+    const wrappedOnReasoning = onReasoning
+      ? async (chunk) => {
+          tokensEmitted = true;
+          await onReasoning(chunk);
+        }
+      : null;
 
     for (let i = 0; i < candidates.length; i++) {
       const candidateModel = candidates[i];
@@ -151,6 +158,7 @@ export class BaseProvider {
           messages,
           stream,
           onToken: wrappedOnToken,
+          onReasoning: wrappedOnReasoning,
           signal,
           responseFormat,
           tools,

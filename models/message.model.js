@@ -24,6 +24,11 @@ const messageSchema = new mongoose.Schema({
     required: true
   },
 
+  reasoning: {
+    type: String,
+    default: ""
+  },
+
   tokens: {
     type: Number,
     default: 0

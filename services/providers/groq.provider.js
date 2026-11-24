@@ -1,6 +1,10 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
 import Groq from "groq-sdk";
+import {
+  createStreamReasoningFilter,
+  extractThinkReasoning,
+} from "../../utils/reasoningParser.js";
 
 /**
  * GroqProvider integrates Groq API with multi-key pool support
@@ -33,6 +37,7 @@ export class GroqProvider extends BaseProvider {
     messages,
     stream = false,
     onToken = null,
+    onReasoning = null,
     signal = null,
     responseFormat = null,
     tools = null,
@@ -69,7 +74,8 @@ export class GroqProvider extends BaseProvider {
           signal,
         });
 
-        let raw = "";
+        const filter = createStreamReasoningFilter({ onToken, onReasoning });
+
         for await (const chunk of streamResponse) {
           if (signal?.aborted) {
             throw new Error("Request aborted by timeout or client.");
@@ -79,11 +85,22 @@ export class GroqProvider extends BaseProvider {
             err.status = chunk.error.code || 500;
             throw err;
           }
+
+          // 1. Direct reasoning delta (e.g. DeepSeek-R1 models on Groq)
+          const reasoningDelta =
+            chunk.choices?.[0]?.delta?.reasoning ||
+            chunk.choices?.[0]?.delta?.reasoning_content ||
+            "";
+          if (reasoningDelta) {
+            await filter.handleReasoning(reasoningDelta);
+          }
+
+          // 2. Content delta (may contain inline <think> tags)
           const delta = chunk.choices?.[0]?.delta?.content || "";
           if (delta) {
-            raw += delta;
-            if (onToken) await onToken(delta);
+            await filter.handleContent(delta);
           }
+
           if (chunk.x_groq?.usage) {
             usage.promptTokens = chunk.x_groq.usage.prompt_tokens || usage.promptTokens;
             usage.completionTokens =
@@ -100,7 +117,9 @@ export class GroqProvider extends BaseProvider {
               usage.promptTokens + usage.completionTokens;
           }
         }
-        return { raw, usage, streamed: true };
+
+        const { raw, reasoning } = await filter.flush();
+        return { raw, reasoning, usage, streamed: true };
       } else {
         const response = await client.chat.completions.create(params, {
           signal,
@@ -112,7 +131,17 @@ export class GroqProvider extends BaseProvider {
           throw err;
         }
 
-        const raw = response.choices?.[0]?.message?.content || "";
+        const choice = response.choices?.[0]?.message;
+        let raw = choice?.content || "";
+        let reasoning =
+          choice?.reasoning || choice?.reasoning_content || "";
+
+        if (!reasoning && raw.includes("<think>")) {
+          const extracted = extractThinkReasoning(raw);
+          raw = extracted.content;
+          reasoning = extracted.reasoning;
+        }
+
         if (response.usage) {
           usage.promptTokens = response.usage.prompt_tokens || 0;
           usage.completionTokens = response.usage.completion_tokens || 0;
@@ -120,7 +149,7 @@ export class GroqProvider extends BaseProvider {
             response.usage.total_tokens ||
             usage.promptTokens + usage.completionTokens;
         }
-        return { raw, usage, streamed: false };
+        return { raw, reasoning, usage, streamed: false };
       }
     });
   }

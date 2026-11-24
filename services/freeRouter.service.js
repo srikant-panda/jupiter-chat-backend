@@ -110,7 +110,7 @@ export class FreeRouterService {
   /**
    * Generates answer using the free tier with timeout cancellation and auto-failover.
    */
-  async generateFreeAnswer({ messages, onToken = null, timeoutMs = null }) {
+  async generateFreeAnswer({ messages, onToken = null, onReasoning = null, timeoutMs = null }) {
     const limitMs = timeoutMs || this.timeoutMs;
     const available = providerRegistry.getAvailableFreeProviders();
 
@@ -151,6 +151,14 @@ export class FreeRouterService {
       const chunks = [];
       const decode = createAnswerDecoder();
 
+      const wrappedOnReasoning = onReasoning
+        ? async (chunk) => {
+            if (timer) clearTimeout(timer);
+            tokensEmitted = true;
+            await onReasoning(chunk);
+          }
+        : undefined;
+
       try {
         const timeoutPromise = new Promise((_, reject) => {
           timer = setTimeout(() => {
@@ -174,6 +182,7 @@ export class FreeRouterService {
               stream: Boolean(onToken),
               signal: abortController.signal,
               responseFormat: reqFormat,
+              onReasoning: wrappedOnReasoning,
               onToken: onToken
                 ? async (delta) => {
                     // Reset timeout timer on successful token emission
@@ -196,6 +205,7 @@ export class FreeRouterService {
                 messages: chatMessages,
                 stream: Boolean(onToken),
                 signal: abortController.signal,
+                onReasoning: wrappedOnReasoning,
                 onToken: onToken
                   ? async (delta) => {
                       if (timer) clearTimeout(timer);
@@ -228,6 +238,7 @@ export class FreeRouterService {
         );
         return {
           ...parsed,
+          reasoning: response.reasoning || "",
           usage: response.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
           provider: provider.name,
           model,
