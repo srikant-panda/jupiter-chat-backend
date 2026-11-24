@@ -1,4 +1,5 @@
 import { AppError } from "../../utils/appError.js";
+import { devWarn, extractCleanLLMError } from "../../utils/logger.js";
 
 /**
  * BaseProvider defines the common contract for all AI model providers.
@@ -190,8 +191,8 @@ export class BaseProvider {
 
         const hasMore = i < candidates.length - 1;
         if (hasMore) {
-          console.warn(
-            `[${this.name}] Model "${candidateModel}" failed (${err.message || status}). Falling back to next model "${candidates[i + 1]}" (${i + 2}/${candidates.length})...`
+          devWarn(
+            `[${this.name}] Model "${candidateModel}" failed (${extractCleanLLMError(err)}). Falling back to next model "${candidates[i + 1]}" (${i + 2}/${candidates.length})...`
           );
         }
       }

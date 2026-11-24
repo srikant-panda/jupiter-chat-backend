@@ -1,4 +1,5 @@
 import { AppError } from "../utils/appError.js";
+import { devLog, devWarn, extractCleanLLMError } from "../utils/logger.js";
 
 /**
  * Checks whether an error is caused by rate limiting or quota exhaustion.
@@ -96,7 +97,7 @@ export class KeyPool {
   isKeyAvailable(item, now = Date.now()) {
     if (!item.blacklistedUntil) return true;
     if (now >= item.blacklistedUntil) {
-      console.log(
+      devLog(
         `[KeyPool:${this.providerName}] Cooldown expired for key ...${item.key.slice(-4)}. Restoring to active pool.`
       );
       item.blacklistedUntil = null;
@@ -185,13 +186,14 @@ export class KeyPool {
     const until = Date.now() + cooldownMs;
 
     item.blacklistedUntil = until;
-    item.blacklistReason = error?.message || "Rate limit / quota exceeded";
+    const cleanReason = extractCleanLLMError(error) || "Rate limit / quota exceeded";
+    item.blacklistReason = cleanReason;
     item.failureCount += 1;
 
-    console.warn(
+    devWarn(
       `[KeyPool:${this.providerName}] Key ...${key.slice(-4)} blacklisted for ${hours}h until ${new Date(
         until
-      ).toISOString()} due to rate limit: ${item.blacklistReason}`
+      ).toISOString()} due to rate limit: ${cleanReason}`
     );
   }
 
@@ -232,7 +234,7 @@ export class KeyPool {
           this.reportRateLimit(key, err);
           // If there are other keys still available in this pool, try the next key immediately
           if (this.hasAvailableKey()) {
-            console.warn(
+            devWarn(
               `[KeyPool:${this.providerName}] Key hit rate limit, retrying immediately with another available key (attempt ${attempts}/${maxAttempts})...`
             );
             continue;

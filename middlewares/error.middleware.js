@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import { devError, extractCleanLLMError } from "../utils/logger.js";
 
 /**
  * Centralized Express error-handling middleware.
@@ -65,7 +66,7 @@ export const errorHandler = (err, req, res, next) => {
   const isOperational = err.isOperational || statusCode < 500;
 
   if (statusCode >= 500) {
-    console.error(`[Error] ${req.method} ${req.originalUrl}:`, err);
+    devError(`[Error] ${req.method} ${req.originalUrl}:`, extractCleanLLMError(err));
   }
 
   const message = isOperational

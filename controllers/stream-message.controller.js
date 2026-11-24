@@ -11,6 +11,7 @@ import {
 } from "../utils/userUsage.js";
 import { updateSummaryIfNeeded } from "../services/summary.service.js";
 import { messageRequest } from "../validators/message.schema.js";
+import { devError, extractCleanLLMError } from "../utils/logger.js";
 
 const event = (res, name, data) => {
   if (!res.destroyed && !res.writableEnded)
@@ -195,10 +196,10 @@ async function respond(req, res, streaming) {
       });
     if (chat)
       updateSummaryIfNeeded(chat._id).catch((err) =>
-        console.error("Summary update failed:", err.message),
+        devError("Summary update failed:", extractCleanLLMError(err)),
       );
   } catch (err) {
-    console.error("Response failed:", err.message);
+    devError("Response failed:", extractCleanLLMError(err));
     const message =
       "Could not complete the response. Please retry or select another model.";
     if (res.headersSent) {
