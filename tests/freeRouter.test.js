@@ -182,3 +182,68 @@ test("FreeRouter: when only one provider has the free feature, all requests rout
     (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = origAvailable;
   }
 });
+
+test("FreeRouter: orders candidate providers Groq first, then OpenRouter, then Gemini in automatic multi-provider setup", async () => {
+  const router = new FreeRouterService({ timeoutMs: 50 });
+
+  const geminiProv = new BaseProvider({
+    name: "gemini",
+    keyPool: new KeyPool({ providerName: "gemini", keys: ["k1"] }),
+    defaultFreeModel: "gemini-2.0-flash",
+  });
+  const openrouterProv = new BaseProvider({
+    name: "openrouter",
+    keyPool: new KeyPool({ providerName: "openrouter", keys: ["k2"] }),
+    defaultFreeModel: "openrouter/free",
+  });
+  const groqProv = new BaseProvider({
+    name: "groq",
+    keyPool: new KeyPool({ providerName: "groq", keys: ["k3"] }),
+    defaultFreeModel: "llama-3.3-70b-versatile",
+  });
+
+  // Verify orderCandidateProviders orders Groq first, then OpenRouter, then Gemini regardless of input array order
+  const ordered = router.orderCandidateProviders([geminiProv, openrouterProv, groqProv]);
+  assert.deepEqual(ordered.map((p) => p.name), ["groq", "openrouter", "gemini"]);
+
+  // Verify execution attempts Groq first, fails over to OpenRouter, then to Gemini
+  const callSequence = [];
+  groqProv.chat = async () => {
+    callSequence.push("groq");
+    throw new Error("Groq unavailable 503");
+  };
+  openrouterProv.chat = async () => {
+    callSequence.push("openrouter");
+    throw new Error("OpenRouter rate limit 429");
+  };
+  geminiProv.chat = async () => {
+    callSequence.push("gemini");
+    return {
+      raw: JSON.stringify({
+        title: "Gemini Success",
+        answer: "Gemini fallback succeeded",
+      }),
+      usage: { totalTokens: 8 },
+    };
+  };
+
+  const origAvailable = (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders;
+  (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = () => [
+    geminiProv,
+    openrouterProv,
+    groqProv,
+  ];
+
+  try {
+    const result = await router.generateFreeAnswer({
+      messages: [{ role: "user", content: "test provider sequence" }],
+    });
+
+    // Verify sequence was groq -> openrouter -> gemini
+    assert.deepEqual(callSequence, ["groq", "openrouter", "gemini"]);
+    assert.equal(result.provider, "gemini");
+    assert.equal(result.result, "Gemini fallback succeeded");
+  } finally {
+    (await import("../services/providers/providerRegistry.js")).default.getAvailableFreeProviders = origAvailable;
+  }
+});
