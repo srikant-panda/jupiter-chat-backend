@@ -37,6 +37,7 @@ export class OpenRouterProvider extends BaseProvider {
     model,
     messages,
     stream = false,
+    webSearch = false,
     onToken = null,
     onReasoning = null,
     signal = null,
@@ -49,6 +50,7 @@ export class OpenRouterProvider extends BaseProvider {
         model,
         messages,
         stream,
+        webSearch,
         onToken,
         onReasoning,
         signal,
@@ -60,14 +62,25 @@ export class OpenRouterProvider extends BaseProvider {
 
   async _executeWithClient(
     client,
-    { model, messages, stream, onToken, onReasoning, signal, responseFormat, tools }
+    { model, messages, stream, webSearch, onToken, onReasoning, signal, responseFormat, tools }
   ) {
+    const activeTools = tools ? [...tools] : [];
+    if (webSearch && !activeTools.some((t) => t.type === "openrouter:web_search")) {
+      activeTools.push({
+        type: "openrouter:web_search",
+        parameters: {
+          engine: "auto",
+          max_results: 5,
+        },
+      });
+    }
+
     const chatRequest = {
       model,
       messages,
       stream: Boolean(stream),
       ...(responseFormat ? { responseFormat } : {}),
-      ...(tools ? { tools } : {}),
+      ...(activeTools.length > 0 ? { tools: activeTools } : {}),
     };
 
     const response = await client.chat.send({

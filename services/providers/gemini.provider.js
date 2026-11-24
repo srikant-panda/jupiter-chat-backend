@@ -35,6 +35,7 @@ export class GeminiProvider extends BaseProvider {
     model,
     messages,
     stream = false,
+    webSearch = false,
     onToken = null,
     onReasoning = null,
     signal = null,
@@ -97,6 +98,20 @@ export class GeminiProvider extends BaseProvider {
         config.abortSignal = signal;
       }
 
+      if (webSearch || (tools && tools.length > 0)) {
+        const hasWebSearch =
+          webSearch ||
+          tools.some(
+            (t) =>
+              t.type === "openrouter:web_search" ||
+              t.type === "web_search" ||
+              t.googleSearch
+          );
+        if (hasWebSearch) {
+          config.tools = [{ googleSearch: {} }];
+        }
+      }
+
       if (responseFormat) {
         config.responseMimeType = "application/json";
         config.responseSchema = {
@@ -113,16 +128,6 @@ export class GeminiProvider extends BaseProvider {
           },
           required: ["title", "answer"],
         };
-      } else if (tools && tools.length > 0) {
-        const hasWebSearch = tools.some(
-          (t) =>
-            t.type === "openrouter:web_search" ||
-            t.type === "web_search" ||
-            t.googleSearch
-        );
-        if (hasWebSearch) {
-          config.tools = [{ googleSearch: {} }];
-        }
       }
 
       const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };

@@ -26,7 +26,7 @@ async function respond(req, res, streaming) {
     const parsed = messageRequest.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ message: parsed.error.issues[0].message });
-    const { content, model, temporary, history } = parsed.data;
+    const { content, model, webSearch = false, temporary, history } = parsed.data;
     const chatId = req.params.chatId;
     if (temporary && chatId)
       return res
@@ -95,6 +95,7 @@ async function respond(req, res, streaming) {
         chatId: chat._id,
         role: "user",
         content,
+        webSearch: Boolean(webSearch),
       });
       await Chat.updateOne(
         { _id: chat._id },
@@ -124,6 +125,7 @@ async function respond(req, res, streaming) {
       model: modelId,
       provider: modelDoc?.provider,
       messages: prepared,
+      webSearch: Boolean(webSearch),
       onToken: streaming ? (text) => event(res, "token", { text }) : undefined,
       onReasoning: streaming ? (text) => event(res, "reasoning", { text }) : undefined,
     });
@@ -135,6 +137,7 @@ async function respond(req, res, streaming) {
         role: "assistant",
         content: result,
         reasoning: reasoning || "",
+        webSearch: Boolean(webSearch),
         tokens: usage.completionTokens,
         usage,
       });
@@ -181,6 +184,7 @@ async function respond(req, res, streaming) {
       role: "assistant",
       reply: result,
       reasoning: reasoning || "",
+      webSearch: Boolean(webSearch),
       usage,
       topic: chat?.topic || title,
       messageCount: chat?.messageCount || history.length + 2,

@@ -36,6 +36,7 @@ export class GroqProvider extends BaseProvider {
     model,
     messages,
     stream = false,
+    webSearch = false,
     onToken = null,
     onReasoning = null,
     signal = null,
@@ -59,11 +60,17 @@ export class GroqProvider extends BaseProvider {
         formattedResponseFormat = { type: "json_object" };
       }
 
+      const activeTools = tools ? [...tools] : [];
+      if (webSearch && !activeTools.some((t) => t.type === "browser_search")) {
+        activeTools.push({ type: "browser_search" });
+      }
+
       const params = {
         model,
         messages: cleanMessages,
         stream: Boolean(stream),
         ...(formattedResponseFormat ? { response_format: formattedResponseFormat } : {}),
+        ...(activeTools.length > 0 ? { tools: activeTools } : {}),
       };
 
       const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
