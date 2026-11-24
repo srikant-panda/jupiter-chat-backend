@@ -1,9 +1,10 @@
 import { BaseProvider } from "./base.provider.js";
 import { KeyPool } from "../keyPool.service.js";
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
 /**
- * GroqProvider integrates Groq API with multi-key pool support.
+ * GroqProvider integrates Groq API with multi-key pool support
+ * using Groq's official SDK (groq-sdk) and real Server-Sent Events (SSE) streaming.
  * Groq offers ultra-fast inference with generous free-tier quotas.
  */
 export class GroqProvider extends BaseProvider {
@@ -37,9 +38,8 @@ export class GroqProvider extends BaseProvider {
     tools = null,
   }) {
     return this.keyPool.executeWithRetry(async (key) => {
-      const client = new OpenAI({
+      const client = new Groq({
         apiKey: key,
-        baseURL: "https://api.groq.com/openai/v1",
       });
 
       // Filter messages to roles Groq supports (system, user, assistant)
@@ -64,6 +64,7 @@ export class GroqProvider extends BaseProvider {
       const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
       if (stream) {
+        // Groq SDK returns an async iterable of Server-Sent Event (SSE) chunks
         const streamResponse = await client.chat.completions.create(params, {
           signal,
         });
@@ -83,7 +84,14 @@ export class GroqProvider extends BaseProvider {
             raw += delta;
             if (onToken) await onToken(delta);
           }
-          if (chunk.usage) {
+          if (chunk.x_groq?.usage) {
+            usage.promptTokens = chunk.x_groq.usage.prompt_tokens || usage.promptTokens;
+            usage.completionTokens =
+              chunk.x_groq.usage.completion_tokens || usage.completionTokens;
+            usage.totalTokens =
+              chunk.x_groq.usage.total_tokens ||
+              usage.promptTokens + usage.completionTokens;
+          } else if (chunk.usage) {
             usage.promptTokens = chunk.usage.prompt_tokens || usage.promptTokens;
             usage.completionTokens =
               chunk.usage.completion_tokens || usage.completionTokens;
