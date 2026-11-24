@@ -1,5 +1,6 @@
 import providerRegistry from "./providers/providerRegistry.js";
 import { AppError } from "../utils/appError.js";
+import { devLog, devWarn, extractCleanLLMError } from "../utils/logger.js";
 import {
   responseFormat,
   responseInstruction,
@@ -139,7 +140,7 @@ export class FreeRouterService {
         ? limitMs
         : (this.singleProviderTimeoutMs || Math.max(limitMs * 4, 60000));
 
-      console.log(
+      devLog(
         `[FreeRouter] Routing free request to provider "${provider.name}" (model: ${model}) with timeout ${currentTimeoutMs}ms (${
           hasAlternative ? "failover enabled" : "final/only provider, extended wait"
         })...`
@@ -233,7 +234,7 @@ export class FreeRouterService {
           await onToken(parsed.result);
         }
 
-        console.log(
+        devLog(
           `[FreeRouter] Successfully completed response via provider "${provider.name}".`
         );
         return {
@@ -247,8 +248,8 @@ export class FreeRouterService {
         if (timer) clearTimeout(timer);
         lastError = err;
 
-        console.warn(
-          `[FreeRouter] Provider "${provider.name}" failed: ${err.message}`
+        devWarn(
+          `[FreeRouter] Provider "${provider.name}" failed: ${extractCleanLLMError(err)}`
         );
 
         // If tokens were already emitted to client stream, cannot seamlessly restart stream
@@ -262,7 +263,7 @@ export class FreeRouterService {
 
         // If more candidate providers remain, failover seamlessly
         if (i < candidateQueue.length - 1) {
-          console.log(
+          devLog(
             `[FreeRouter] Seamlessly switching to next available provider "${candidateQueue[i + 1].name}"...`
           );
           continue;
